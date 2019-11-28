@@ -7,40 +7,70 @@
 %%
 %% curl -v -v -X POST -H 'Content-Type: application/json' http://127.0.0.1:9411/api/v2/spans -d @-
 
+%%
+%% user-session traceId=1 id=1
+%%   transaction traceId=1 id=2 parentId=1 ...
+%%     validation traceId=1 id=3 parentId=2
+%%     ...
+%%   transaction traceId=1 id=4 parentId=1
+%%     ...
+%% user-session
+%%
+%%
+%% Generate "dummy" spans for user sessions and transactions, to have
+%% something to "hang" real spans on (no timestamp needed, or possibly
+%% first timestamp found)
+%%
+
 
 test() ->
     code:add_path("/Users/seb/Desktop/src/eparse/ejson/ebin"),
     application:start(ejson),
     io:put_chars("[\n"),
     start("/tmp/progress-trace-nso2.csv"),
-    io:put_chars("{}\n]\n"),
+    io:put_chars("]\n"),
     erlang:halt(0).
 
 start(FName) ->
     {ok, F} = open(FName),
-    loop(F).
+    loop(F, file:read_line(F), undefined, #{}).
 
-loop(F) ->
-    loop(F, file:read_line(F)).
-
-loop(F, eof) ->
+loop(F, eof, Span, _State) ->
+    print_span(Span, false),
     file:close(F),
     ok;
-loop(F, {ok, Line}) ->
-    M = pline2map(string:split(chop(Line), ",", all)),
-    %%io:format("~999p\n", [M]),
-    span(M),
-    loop(F).
+loop(F, {ok, Line}, Span, State0) ->
+    print_span(Span, true),
+    {NextSpan, State1} = line2span(Line, State0),
+    loop(F, file:read_line(F), NextSpan, State1).
 
-
-span(#{timestamp := <<"TIMESTAMP">>}) ->
+print_span(undefined, _CommaP) ->
     ok;
-span(#{duration := D} = M) when D > 10000 ->
+print_span(Span, CommaP) ->
+    io:put_chars(sejst:encode(Span)),
+    print_nl(CommaP),
+    ok.
+
+print_nl(true) ->
+    io:put_chars(",\n");
+print_nl(false) ->
+    io:put_chars("\n").
+
+line2span(Line, State) ->
+    M = pline2map(string:split(chop(Line), ",", all)),
+%    io:format("~999p\n", [M]),
+    span(M, State).
+
+span(#{timestamp := <<"TIMESTAMP">>}, State) ->
+    {undefined, State};
+span(#{duration := D} = M, State) -> % when D > 10000 ->
+    Duration = case D of 0 -> 1; _ -> D end,
     Tags = maps:without([duration,timestamp], M),
     S0 = #{id => id(M),
            traceId => traceid(M),
+           parentId => hex16(maps:get(usid, M)),
            timestamp => maps:get(timestamp,M) - D,
-           duration => D,
+           duration => Duration,
            tags => Tags},
     S1 =
         case maps:is_key(subsystem, M) of
@@ -57,11 +87,10 @@ span(#{duration := D} = M) when D > 10000 ->
                 S1
         end,
     S3 = addname(M, S2),
-    io:put_chars(sejst:encode(S3)),
-    io:put_chars(",\n"),
-    S3;
-span(_) ->
-    ok.
+%    io:put_chars(sejst:encode(S3)),
+    {S3, State};
+span(_, State) ->
+    {undefined, State}.
 
 id(M) ->
     hexstr(binary:part(
@@ -105,7 +134,7 @@ name(_) ->
 
 
 
-hex16(Integer) ->
+hex16(Integer) when is_integer(Integer) ->
     lists:flatten(io_lib:format("~16.16.0b", [Integer])).
 
 hash_term(Term) ->
@@ -115,7 +144,7 @@ hash(Binary) ->
     %% crypto:hash(sha256, Binary)
     erlang:md5(Binary).
 
-hexstr(Binary) ->
+hexstr(Binary) when is_binary(Binary) ->
     iolist_to_binary(
       lists:map(
         fun (Byte) -> io_lib:format("~2.16.0b", [Byte]) end,
@@ -141,7 +170,7 @@ chop(B) ->
     binary:part(B, 0, byte_size(B) - 1).
 
 
-pline2map(Line) ->
+pline2map(Line) when length(Line) == 14 ->
     makemap(Line, [{timestamp,timestamp},
                    {tid, integer},
                    {usid, integer},
@@ -154,6 +183,24 @@ pline2map(Line) ->
                    node,
                    device,
                    'device-phase',
+                   {duration, fun (Str) ->
+                                      1000 * round(binary_to_float(Str) * 1000)
+                              end},
+                   {message, quoted}]);
+pline2map(Line) when length(Line) == 15 ->
+    makemap(Line, [{timestamp,timestamp},
+                   {tid, integer},
+                   {usid, integer},
+                   context,
+                   subsystem,
+                   phase,
+                   service,
+                   'service-phase',
+                   {'commit-queue-id', integer},
+                   node,
+                   device,
+                   'device-phase',
+                   package,
                    {duration, fun (Str) ->
                                       1000 * round(binary_to_float(Str) * 1000)
                               end},
