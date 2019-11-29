@@ -89,20 +89,15 @@ span(M, State0) ->
               parentId => ParentId,
               traceId => traceid(M),
               tags => Tags},
-    S1 =
-        case maps:is_key(subsystem, M) of
-            true ->
-                S0#{localEndPoint => #{serviceName => maps:get(subsystem, M)}};
-            false ->
-                S0
-        end,
-    S2 =
-        case maps:is_key(device, M) of
-            true ->
-                S1#{remoteEndpoint => #{serviceName => maps:get(device, M)}};
-            false ->
-                S1
-        end,
+    case maps:is_key(device, M) of
+        true ->
+            S1 = update(subsystem, M, localEndPoint, serviceName, S0),
+            S2 = update(device, M, remoteEndpoint, serviceName, S1);
+        false ->
+            S1 = update(context, M, localEndPoint, serviceName, S0),
+            S2 = update(subsystem, M, remoteEndpoint, serviceName,
+                     update(context, M, remoteEndpoint, serviceName, S1))
+    end,
     S3 = addname(M, S2),
     {S3, State}.
 
@@ -111,6 +106,31 @@ parent_id(M, State) ->
         undefined -> maps:get({usid, musid(M)}, State);
         Tid -> maps:get({tid,Tid}, State)
     end.
+
+%% update(Key1, Map1, Key2, Map2) ->
+%%     case maps:find(Key1, M) of
+%%         {ok, Value} ->
+%%             maps:put(Key2, Value, Map2);
+%%         error ->
+%%             Map2
+%%     end.
+
+update(Key1, Map1, Key2, Key3, Map2) ->
+    case maps:find(Key1, Map1) of
+        {ok, Value} ->
+            NewValue2 =
+                case maps:find(Key2, Map2) of
+                    {ok, M} when is_map(M) ->
+                        maps:put(Key3, Value, M);
+                    _ ->
+                        #{Key3 => Value}
+                end,
+            maps:put(Key2, NewValue2, Map2);
+        error ->
+            Map2
+    end.
+
+
 
 update_state(M, Id, State) ->
     update_state(mtid(M), musid(M), Id, State).
@@ -180,15 +200,26 @@ name(#{'commit-queue-id' := CQ}) when is_integer(CQ) ->
 name(_) ->
     undefined.
 
-transform_message(Msg) ->
-    lists:foldl(
-      fun (Pattern, Str) ->
-              case string:split(Str, Pattern, trailing) of
-                  [Str2] -> Str2;
-                  [Str2, <<>>] -> Str2;
-                  _ -> Str
-              end
-      end, Msg, [<<"...">>, <<" done">>, <<" ok">>]).
+transform_message(Msg0) ->
+    Msg1 =
+        lists:foldl(
+          fun (Pattern, Str) ->
+                  case string:split(Str, Pattern, trailing) of
+                      [Str2] -> Str2;
+                      [Str2, <<>>] -> Str2;
+                      _ -> Str
+                  end
+          end, Msg0, [<<"...">>, <<" done">>, <<" ok">>]),
+    Msg2 =
+        lists:foldl(
+          fun (Pattern, Str) ->
+                  case string:split(Str, Pattern, leading) of
+                      [Str2] -> Str2;
+                      [<<>>, Str2] -> Str2;
+                      _ -> Str
+                  end
+          end, Msg1, [<<"entering ">>, <<"leaving ">>]),
+    Msg2.
 
 hex16(Integer) when is_integer(Integer) ->
     lists:flatten(io_lib:format("~16.16.0b", [Integer])).
