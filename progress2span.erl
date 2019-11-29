@@ -1,35 +1,11 @@
 -module(progress2span).
 
--compile(export_all).
-
-%% Post to http://127.0.0.1:9411/api/v2/spans
-%% with Content-Type: application/json
-%%
-%% curl -v -v -X POST -H 'Content-Type: application/json' http://127.0.0.1:9411/api/v2/spans -d @-
-
-%%
-%% user-session traceId=1 id=1
-%%   transaction traceId=1 id=2 parentId=1 ...
-%%     validation traceId=1 id=3 parentId=2
-%%     ...
-%%   transaction traceId=1 id=4 parentId=1
-%%     ...
-%% user-session
-%%
-%%
-%% Generate "dummy" spans for user sessions and transactions, to have
-%% something to "hang" real spans on (no timestamp needed, or possibly
-%% first timestamp found)
-%%
-
+%% -compile(export_all).
+-export([main/1]).
 
 init() ->
     code:add_path("/Users/seb/Desktop/src/eparse/ejson/ebin"),
     application:start(ejson).
-
-test() ->
-    main(["/tmp/progress-trace-nso2.csv"]),
-    erlang:halt(0).
 
 main(Args) ->
     {I, O} =
@@ -93,7 +69,6 @@ line2span(Line, State) ->
 
 span(#{timestamp := <<"TIMESTAMP">>}, State) ->
     {undefined, State};
-% span(#{duration := D} = M, State) when D > 10000 ->
 span(M, State0) ->
     Id = id(M),
     State = update_state(M, Id, State0),
@@ -129,9 +104,7 @@ span(M, State0) ->
                 S1
         end,
     S3 = addname(M, S2),
-    {S3, State};
-span(_, State) ->
-    {undefined, State}.
+    {S3, State}.
 
 parent_id(M, State) ->
     case mtid(M) of
@@ -200,20 +173,10 @@ addname(M, S) ->
 
 name(#{message := Msg}) ->
     transform_message(Msg);
-name(#{message := <<"partial-sync-from done">>}) ->
-    <<"partial-sync-from">>;
-name(#{message := <<"calculating southbound diff ok">>}) ->
-    <<"diff">>;
-name(#{message := <<"device get-trans-id ok">>}) ->
-    <<"transid">>;
-name(#{message := <<"device connect ok">>}) ->
-    <<"connect">>;
-name(#{message := <<"device initialize ok">>}) ->
-    <<"initialize">>;
 name(#{tid := Tid}) when is_integer(Tid) andalso Tid >= 1 ->
     <<"transaction">>;
 name(#{'commit-queue-id' := CQ}) when is_integer(CQ) ->
-    <<"CQ">>;
+    <<"commit queue">>;
 name(_) ->
     undefined.
 
@@ -242,19 +205,6 @@ hexstr(Binary) when is_binary(Binary) ->
       lists:map(
         fun (Byte) -> io_lib:format("~2.16.0b", [Byte]) end,
         binary_to_list(Binary))).
-
-
-newmap(OldMap, KeyMapping) ->
-    lists:foldl(
-      fun ({K,NK}, M0) ->
-              case maps:is_key(K, OldMap) of
-                  true ->
-                      M0#{NK => maps:get(K, OldMap)};
-                  false ->
-                      M0
-              end
-      end, #{}, KeyMapping).
-
 
 pline2map(Line) when length(Line) == 14 ->
     makemap(Line, [{timestamp,timestamp},
@@ -320,7 +270,8 @@ addmap(Map, Key, ValueStr, Type) ->
                     ValueStr;
                 quoted ->
                     %% shortcut
-                    binary:part(ValueStr, 1, byte_size(ValueStr) - 2);
+                    Str = string:trim(ValueStr),
+                    binary:part(Str, 1, byte_size(Str) - 2);
                 F when is_function(Type, 1) ->
                     F(ValueStr)
             end
