@@ -23,55 +23,97 @@
 %%
 
 
-test() ->
+init() ->
     code:add_path("/Users/seb/Desktop/src/eparse/ejson/ebin"),
-    application:start(ejson),
-    io:put_chars("[\n"),
-    start("/tmp/progress-trace-nso2.csv"),
-    io:put_chars("]\n"),
+    application:start(ejson).
+
+test() ->
+    main(["/tmp/progress-trace-nso2.csv"]),
     erlang:halt(0).
 
-start(FName) ->
-    {ok, F} = open(FName),
-    loop(F, file:read_line(F), undefined, #{}).
+main(Args) ->
+    {I, O} =
+        case Args of
+            [] ->
+                %% Is there really no other way?
+                {ok, F} = ropen("/dev/stdin"),
+                {F, standard_output};
+            [FName] ->
+                {ok, F} = ropen(FName),
+                {F, standard_output};
+            [InFile, OutFile] ->
+                {ok, F1} = ropen(InFile),
+                {ok, F2} = wopen(OutFile),
+                {F1, F2};
+            _ ->
+                io:format(standard_error, "Unknown args: ~p\n", [Args]),
+                erlang:halt(1)
+        end,
+    init(),
+    process(I, O),
+    erlang:halt(0).
 
-loop(F, eof, Span, _State) ->
-    print_span(Span, false),
-    file:close(F),
-    ok;
-loop(F, {ok, Line}, Span, State0) ->
-    print_span(Span, true),
-    {NextSpan, State1} = line2span(Line, State0),
-    loop(F, file:read_line(F), NextSpan, State1).
+ropen(FileName) ->
+    file:open(FileName, [read,raw,binary,read_ahead]).
 
-print_span(undefined, _CommaP) ->
-    ok;
-print_span(Span, CommaP) ->
-    io:put_chars(sejst:encode(Span)),
-    print_nl(CommaP),
+wopen(FileName) ->
+    file:open(FileName, [write]).
+
+process(I, O) ->
+    io:put_chars(O, "[\n"),
+    loop(I, O, file:read_line(I), undefined, #{}),
+    io:put_chars(O, "]\n"),
     ok.
 
-print_nl(true) ->
-    io:put_chars(",\n");
-print_nl(false) ->
-    io:put_chars("\n").
+loop(I, O, eof, Span, _State) ->
+    print_span(O, Span, false),
+    file:close(I),
+    ok;
+loop(I, O, {ok, Line}, Span, State0) ->
+    print_span(O, Span, true),
+    {NextSpan, State1} = line2span(Line, State0),
+    loop(I, O, file:read_line(I), NextSpan, State1).
+
+print_span(_, undefined, _CommaP) ->
+    ok;
+print_span(O, Span, CommaP) ->
+    io:put_chars(O, sejst:encode(Span)),
+    print_nl(O, CommaP),
+    ok.
+
+print_nl(O, true) ->
+    io:put_chars(O, ",\n");
+print_nl(O, false) ->
+    io:put_chars(O, "\n").
 
 line2span(Line, State) ->
-    M = pline2map(string:split(chop(Line), ",", all)),
+    M = pline2map(string:split(string:chomp(Line), ",", all)),
 %    io:format("~999p\n", [M]),
     span(M, State).
 
 span(#{timestamp := <<"TIMESTAMP">>}, State) ->
     {undefined, State};
-span(#{duration := D} = M, State) -> % when D > 10000 ->
-    Duration = case D of 0 -> 1; _ -> D end,
+% span(#{duration := D} = M, State) when D > 10000 ->
+span(M, State0) ->
+    Id = id(M),
+    State = update_state(M, Id, State0),
+    ParentId = parent_id(M, State),
+
+    TS = maps:get(timestamp,M),
+    S00 =
+        case maps:find(duration, M) of
+            {ok, N} when N =< 0 ->
+                #{duration => 1, timestamp => TS};
+            {ok, N} ->
+                #{duration => N, timestamp => TS - N};
+            error ->
+                #{duration => 1, timestamp => TS}
+        end,
     Tags = maps:without([duration,timestamp], M),
-    S0 = #{id => id(M),
-           traceId => traceid(M),
-           parentId => hex16(maps:get(usid, M)),
-           timestamp => maps:get(timestamp,M) - D,
-           duration => Duration,
-           tags => Tags},
+    S0 = S00#{id => Id,
+              parentId => ParentId,
+              traceId => traceid(M),
+              tags => Tags},
     S1 =
         case maps:is_key(subsystem, M) of
             true ->
@@ -87,18 +129,59 @@ span(#{duration := D} = M, State) -> % when D > 10000 ->
                 S1
         end,
     S3 = addname(M, S2),
-%    io:put_chars(sejst:encode(S3)),
     {S3, State};
 span(_, State) ->
     {undefined, State}.
+
+parent_id(M, State) ->
+    case mtid(M) of
+        undefined -> maps:get({usid, musid(M)}, State);
+        Tid -> maps:get({tid,Tid}, State)
+    end.
+
+update_state(M, Id, State) ->
+    update_state(mtid(M), musid(M), Id, State).
+
+mtid(M) ->
+    maps:get(tid, M, undefined).
+musid(M) ->
+    maps:get(usid, M, undefined).
+
+%% If this is the first time we see this usid, save it's id and
+%% make others use it as parentID
+%%
+%% If this is the first time we see this tid, save it's id and
+%% make others use it as parentId
+update_state(T, U, Id, State) ->
+    case maps:is_key({tid, T}, State) of
+        false ->
+            case maps:is_key({usid,U}, State) of
+                %% false ->
+                %%     State#{{tid,T} => Id, {usid,U} => Id};
+                %% true ->
+                %%     State#{{tid,T} => Id}
+                false when T /= undefined ->
+                    State#{{tid,T} => Id, {usid,U} => Id};
+                false ->
+                    State#{{usid,U} => Id};
+                true ->
+                    State#{{tid,T} => Id}
+            end;
+        true ->
+            State
+    end.
+
 
 id(M) ->
     hexstr(binary:part(
              hash_term({maps:get(usid, M),
                         maps:get(tid, M),
-                        maps:get(timestamp, M)}),
+                        maps:get(timestamp, M),
+                        transform_message(maps:get(message, M))}),
              0, 8)).
 
+traceid(#{usid := USId}) when is_integer(USId) andalso USId >= 1 ->
+    hex16(USId);
 traceid(#{tid := Tid}) when is_integer(Tid) andalso Tid >= 1 ->
     hex16(Tid);
 traceid(#{'commit-queue-id' := CQ}) when is_integer(CQ) ->
@@ -115,6 +198,8 @@ addname(M, S) ->
             S#{ name => Name }
     end.
 
+name(#{message := Msg}) ->
+    transform_message(Msg);
 name(#{message := <<"partial-sync-from done">>}) ->
     <<"partial-sync-from">>;
 name(#{message := <<"calculating southbound diff ok">>}) ->
@@ -132,7 +217,15 @@ name(#{'commit-queue-id' := CQ}) when is_integer(CQ) ->
 name(_) ->
     undefined.
 
-
+transform_message(Msg) ->
+    lists:foldl(
+      fun (Pattern, Str) ->
+              case string:split(Str, Pattern, trailing) of
+                  [Str2] -> Str2;
+                  [Str2, <<>>] -> Str2;
+                  _ -> Str
+              end
+      end, Msg, [<<"...">>, <<" done">>, <<" ok">>]).
 
 hex16(Integer) when is_integer(Integer) ->
     lists:flatten(io_lib:format("~16.16.0b", [Integer])).
@@ -163,13 +256,6 @@ newmap(OldMap, KeyMapping) ->
       end, #{}, KeyMapping).
 
 
-open(FName) ->
-    file:open(FName, [read,raw,binary,read_ahead]).
-
-chop(B) ->
-    binary:part(B, 0, byte_size(B) - 1).
-
-
 pline2map(Line) when length(Line) == 14 ->
     makemap(Line, [{timestamp,timestamp},
                    {tid, integer},
@@ -184,7 +270,7 @@ pline2map(Line) when length(Line) == 14 ->
                    device,
                    'device-phase',
                    {duration, fun (Str) ->
-                                      1000 * round(binary_to_float(Str) * 1000)
+                                      1000 * round(to_float(Str) * 1000)
                               end},
                    {message, quoted}]);
 pline2map(Line) when length(Line) == 15 ->
@@ -202,7 +288,7 @@ pline2map(Line) when length(Line) == 15 ->
                    'device-phase',
                    package,
                    {duration, fun (Str) ->
-                                      1000 * round(binary_to_float(Str) * 1000)
+                                      1000 * round(to_float(Str) * 1000)
                               end},
                    {message, quoted}]).
 
@@ -224,10 +310,9 @@ addmap(Map, Key, ValueStr, Type) ->
         try
             case Type of
                 integer ->
-                    binary_to_integer(ValueStr);
+                    to_int(ValueStr);
                 float ->
-                    %% Might need to try binary_to_float(<<ValueStr/binary, ".0">>).
-                    binary_to_float(ValueStr);
+                    to_float(ValueStr);
                 timestamp ->
                     calendar:rfc3339_to_system_time(binary_to_list(ValueStr),
                                                     [{unit,microsecond}]);
@@ -243,3 +328,17 @@ addmap(Map, Key, ValueStr, Type) ->
                 ValueStr
         end,
     Map#{Key => Value}.
+
+to_int(Str) ->
+    case string:to_integer(string:trim(Str)) of
+        {Int, <<"">>} when is_integer(Int) ->
+            Int
+    end.
+
+to_float(Str) ->
+    case string:to_float(string:trim(Str)) of
+        {F, <<"">>} when is_float(F) ->
+            F;
+        {error, no_float} ->
+            to_int(Str) + 0.0
+    end.
