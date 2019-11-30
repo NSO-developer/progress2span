@@ -77,7 +77,8 @@ loop(I, Collector, {ok, Line}) ->
                 traceid = hex16(rand:uniform(16#ffffffffffffffff)),
                 localEndpoint = "nso",
                 utmap = #{},
-                current = #{}
+                current = #{},
+                stacks = #{}
                }).
 
 start_collector(O) ->
@@ -115,7 +116,7 @@ collector_loop(State) ->
 handle_trace(Trace, S0) ->
     case classify(Trace) of
         {start, Key} ->
-            Id = id(Trace),
+            Id = span_id(Trace),
             State1 = update_utmap(Trace, Id, S0),
             ParentId = parent_id(Trace, Id, State1),
             Span = make_span(Trace, Id, ParentId, State1),
@@ -128,26 +129,41 @@ handle_trace(Trace, S0) ->
                 {Span, S1} ->
                     print_span(add_stop(Trace, Span), S1)
             end;
-        {annotation, _Key} ->
-            %% update_with(Key,
-            %%             fun (Span) -> add_annotation(Trace, Span) end, S0)
-            io:format("dropping annotation: ~p\n", [trace_msg(Trace)]),
-            S0
+        {annotation, Key} ->
+            add_annotation_to_current(Key, Trace, S0)
     end.
 
-push_span(Key, Span, #state{current = C} = State) ->
+push_span(Key, Span, #state{current = C, stacks = Stacks} = State) ->
     case maps:is_key(Key, C) of
         true ->  io:format("Duplicate key: ~p\n", [Key]);
         false -> ok
     end,
-    State#state{current = maps:put(Key, Span, C)}.
+    SKey = stack_key(Key),
+    Stack = maps:get(SKey, Stacks, []),
+    State#state{current = maps:put(Key, Span, C),
+                stacks = maps:put(SKey, [Key|Stack], Stacks)}.
 
-pop_span(Key, #state{current = C} = State) ->
+pop_span(Key, #state{current = C, stacks = Stacks} = State) ->
     case maps:take(Key, C) of
         {Span, New} ->
-            {Span, State#state{current = New}};
+            NewStacks =
+                maps:update_with(stack_key(Key), fun ([_|T]) -> T end, Stacks),
+            {Span, State#state{current = New, stacks = NewStacks}};
         error ->
             undefined
+    end.
+
+add_annotation_to_current(AKey, Trace, #state{current = C} = State) ->
+    case maps:get(stack_key(AKey), State#state.stacks, undefined) of
+        undefined ->
+            io:format("dropping annotation: ~p\n", [trace_msg(Trace)]),
+            State;
+        [] ->
+            io:format("dropping annotation (): ~p\n", [trace_msg(Trace)]),
+            State;
+        [Key|_] ->
+            UpdateF = fun (Span) -> add_annotation(Trace, Span) end,
+            State#state{current = maps:update_with(Key, UpdateF, C)}
     end.
 
 classify(Trace) ->
@@ -167,7 +183,10 @@ classify(Trace) ->
     {Type, key(Trace)}.
 
 key(Trace) ->
-    {musid(Trace), mtid(Trace), trace_name(Trace)}.
+    {musid(Trace), mtid(Trace), trace_name(Trace), trace_device(Trace)}.
+
+stack_key({U,T,_,D}) ->
+    {U,T,D}.
 
 %% XXX
 parent_id(Trace, _Id, State) ->
@@ -229,12 +248,20 @@ make_span(Trace, Id, ParentId, State) ->
            parentId => ParentId,
            id => Id,
            %% kind => ???
+           kind => <<"CLIENT">>,
            timestamp => maps:get(timestamp, Trace),
-           localEndPoint => #{ serviceName => State#state.localEndpoint },
+           localEndpoint => local_endpoint(Trace, State),
            tags => maps:without([name, duration,timestamp], Trace)
           },
-    update(device, Trace, remoteEndpoint, serviceName, S0).
+    updatel([device,service], Trace, remoteEndpoint, serviceName, S0).
 
+local_endpoint(Trace, State) ->
+    case maps:find(subsystem, Trace) of
+        {ok, Subsystem} ->
+            #{ serviceName => Subsystem };
+        _ ->
+            #{ serviceName => State#state.localEndpoint }
+    end.
 
 %% update(Key1, Map1, Key2, Map2) ->
 %%     case maps:find(Key1, M) of
@@ -243,6 +270,11 @@ make_span(Trace, Id, ParentId, State) ->
 %%         error ->
 %%             Map2
 %%     end.
+
+updatel(Keys, Map1, Key2, Key3, Map2) ->
+    foldlwhile(
+      fun (Key, Map) -> update(Key, Map, Key2, Key3, Map2) end,
+      Map1, Keys).
 
 update(Key1, Map1, Key2, Key3, Map2) ->
     case maps:find(Key1, Map1) of
@@ -254,12 +286,22 @@ update(Key1, Map1, Key2, Key3, Map2) ->
                     _ ->
                         #{Key3 => Value}
                 end,
-            maps:put(Key2, NewValue2, Map2);
+            {false, maps:put(Key2, NewValue2, Map2)};
         error ->
-            Map2
+            {true, Map2}
     end.
 
-
+foldlwhile(_F, Acc, []) ->
+    Acc;
+foldlwhile(F, Acc, [H|T]) ->
+    case F(H, Acc) of
+        {true, NewAcc} ->
+            foldlwhile(F, NewAcc, T);
+        {false, NewAcc} ->
+            NewAcc;
+        false ->
+            Acc
+    end.
 
 update_utmap(M, Id, #state{utmap = UTMap} = State) ->
     State#state{utmap = update_utmap(musid(M), mtid(M), Id, UTMap)}.
@@ -294,13 +336,15 @@ update_utmap(U, T, Id, State) ->
     end.
 
 
-id(M) ->
+span_id(M) ->
     TS = maps:get(timestamp, M), % - maps:get(duration, M, 0),
     hexstr(binary:part(
              hash_term({maps:get(usid, M),
                         maps:get(tid, M),
                         TS,
-                        trace_name(M)}),
+                        trace_name(M),
+                        trace_device(M)
+                       }),
              0, 8)).
 
 hex16(Integer) when is_integer(Integer) ->
@@ -470,6 +514,9 @@ trace_msg(TMap) ->
 
 trace_name(TMap) ->
     maps:get(name, TMap, <<"">>).
+
+trace_device(TraceMap) ->
+    maps:get(device, TraceMap, <<"">>).
 
 trace_msg(TraceMap, Direction, Pattern) when is_binary(Pattern) ->
     trace_msg(TraceMap, Direction, [Pattern]);
