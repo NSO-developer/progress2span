@@ -84,9 +84,13 @@ start_collector(O) ->
     io:put_chars(O, "["),
     collector_loop(#state{outfd = O}).
 
-stop_collector(#state{outfd = O}) ->
+stop_collector(#state{outfd = O} = State) ->
     print_nl(O, false),
     io:put_chars(O, "]\n"),
+    case maps:size(State#state.current) of
+        0 -> ok;
+        N -> io:format("~p unmatched start events left\n", [N])
+    end,
     exit(normal).
 
 collector_loop(State) ->
@@ -110,13 +114,14 @@ collector_loop(State) ->
 
 handle_trace(Trace, S0) ->
     case classify(Trace) of
-        {start, Id} ->
+        {start, Key} ->
+            Id = id(Trace),
             State1 = update_utmap(Trace, Id, S0),
             ParentId = parent_id(Trace, Id, State1),
             Span = make_span(Trace, Id, ParentId, State1),
-            push_span(Span, State1);
-        {stop, Id} ->
-            case pop_span(Id, S0) of
+            push_span(Key, Span, State1);
+        {stop, Key} ->
+            case pop_span(Key, S0) of
                 undefined ->
                     io:format("unmatched stop event: ~p\n", [trace_msg(Trace)]),
                     S0;
@@ -130,12 +135,15 @@ handle_trace(Trace, S0) ->
             S0
     end.
 
-push_span(Span, #state{current = C} = State) ->
-    Id = maps:get(id, Span),
-    State#state{current = maps:put(Id, Span, C)}.
+push_span(Key, Span, #state{current = C} = State) ->
+    case maps:is_key(Key, C) of
+        true ->  io:format("Duplicate key: ~p\n", [Key]);
+        false -> ok
+    end,
+    State#state{current = maps:put(Key, Span, C)}.
 
-pop_span(Id, #state{current = C} = State) ->
-    case maps:take(Id, C) of
+pop_span(Key, #state{current = C} = State) ->
+    case maps:take(Key, C) of
         {Span, New} ->
             {Span, State#state{current = New}};
         error ->
@@ -156,7 +164,10 @@ classify(Trace) ->
         _ ->
             ok
     end,
-    {Type, id(Trace)}.
+    {Type, key(Trace)}.
+
+key(Trace) ->
+    {musid(Trace), mtid(Trace), trace_name(Trace)}.
 
 %% XXX
 parent_id(Trace, _Id, State) ->
@@ -211,14 +222,17 @@ add_stop(Trace, Span) ->
     add_annotation(Trace, maps:put(duration, Duration, Span)).
 
 make_span(Trace, Id, ParentId, State) ->
-    S0 = #{traceId => State#state.traceid,
-           name => transform_message(trace_msg(Trace)),
+    S0 = #{
+%           traceId => State#state.traceid,
+           traceId => hex16(musid(Trace)),
+           name => trace_name(Trace),
            parentId => ParentId,
            id => Id,
            %% kind => ???
            timestamp => maps:get(timestamp, Trace),
            localEndPoint => #{ serviceName => State#state.localEndpoint },
-           tags => maps:without([duration,timestamp], Trace)},
+           tags => maps:without([name, duration,timestamp], Trace)
+          },
     update(device, Trace, remoteEndpoint, serviceName, S0).
 
 
@@ -281,34 +295,13 @@ update_utmap(U, T, Id, State) ->
 
 
 id(M) ->
-    TS = maps:get(timestamp, M) - maps:get(duration, M, 0),
+    TS = maps:get(timestamp, M), % - maps:get(duration, M, 0),
     hexstr(binary:part(
              hash_term({maps:get(usid, M),
                         maps:get(tid, M),
                         TS,
-                        transform_message(maps:get(message, M))}),
+                        trace_name(M)}),
              0, 8)).
-
-transform_message(Msg0) ->
-    Msg1 =
-        lists:foldl(
-          fun (Pattern, Str) ->
-                  case string:split(Str, Pattern, trailing) of
-                      [Str2] -> Str2;
-                      [Str2, <<>>] -> Str2;
-                      _ -> Str
-                  end
-          end, Msg0, [<<"...">>, <<" done">>, <<" ok">>]),
-    Msg2 =
-        lists:foldl(
-          fun (Pattern, Str) ->
-                  case string:split(Str, Pattern, leading) of
-                      [Str2] -> Str2;
-                      [<<>>, Str2] -> Str2;
-                      _ -> Str
-                  end
-          end, Msg1, [<<"entering ">>, <<"leaving ">>]),
-    Msg2.
 
 hex16(Integer) when is_integer(Integer) ->
     lists:flatten(io_lib:format("~16.16.0b", [Integer])).
@@ -326,41 +319,73 @@ hexstr(Binary) when is_binary(Binary) ->
         fun (Byte) -> io_lib:format("~2.16.0b", [Byte]) end,
         binary_to_list(Binary))).
 
-pt2map(Line) when length(Line) == 14 ->
-    makemap(Line, [{timestamp,timestamp},
-                   {tid, integer},
-                   {usid, integer},
-                   context,
-                   subsystem,
-                   phase,
-                   service,
-                   'service-phase',
-                   {'commit-queue-id', integer},
-                   node,
-                   device,
-                   'device-phase',
-                   {duration, fun (Str) ->
-                                      1000 * round(to_float(Str) * 1000)
-                              end},
-                   message]);
-pt2map(Line) when length(Line) == 15 ->
-    makemap(Line, [{timestamp,timestamp},
-                   {tid, integer},
-                   {usid, integer},
-                   context,
-                   subsystem,
-                   phase,
-                   service,
-                   'service-phase',
-                   {'commit-queue-id', integer},
-                   node,
-                   device,
-                   'device-phase',
-                   package,
-                   {duration, fun (Str) ->
-                                      1000 * round(to_float(Str) * 1000)
-                              end},
-                   message]).
+pt2map(Line) ->
+    TraceMap0 = makemap(Line, pt_fmt(length(Line))),
+    maps:put(name, transform_message(trace_msg(TraceMap0)), TraceMap0).
+
+pt_fmt(14) ->
+    [{timestamp,timestamp},
+     {tid, integer},
+     {usid, integer},
+     context,
+     subsystem,
+     phase,
+     service,
+     'service-phase',
+     {'commit-queue-id', integer},
+     node,
+     device,
+     'device-phase',
+     {duration, fun (Str) ->
+                        1000 * round(to_float(Str) * 1000)
+                end},
+     message];
+pt_fmt(15) ->
+    [{timestamp,timestamp},
+     {tid, integer},
+     {usid, integer},
+     context,
+     subsystem,
+     phase,
+     service,
+     'service-phase',
+     {'commit-queue-id', integer},
+     node,
+     device,
+     'device-phase',
+     package,
+     {duration, fun (Str) ->
+                        1000 * round(to_float(Str) * 1000)
+                end},
+     message].
+
+%% FIXME
+transform_message(Msg0) ->
+    Msg1 =
+        lists:foldl(
+          fun (Pattern, Str) ->
+                  case string:split(Str, Pattern, trailing) of
+                      [Str2] -> Str2;
+                      [Str2, <<>>] -> Str2;
+                      _ -> Str
+                  end
+          end, Msg0,
+          [<<"...">>, <<" done">>, <<" ok">>, <<" error">>,
+           <<" result 'ok'">>]),
+    Msg2 =
+        lists:foldl(
+          fun (Pattern, Str) ->
+                  case string:split(Str, Pattern, leading) of
+                      [Str2] -> Str2;
+                      [<<>>, Str2] -> Str2;
+                      _ -> Str
+                  end
+          end, Msg1,
+          [<<"run ">>, <<"check ">>, <<"entering ">>, <<"leaving ">>]),
+    transform2(Msg2).
+
+transform2(<<"send NED show">>) -> <<"NED show">>;
+transform2(Msg) -> Msg.
 
 makemap(Values, Mapping) ->
     makemap(#{}, Values, Mapping).
@@ -371,7 +396,6 @@ makemap(Map, [Value|Values], [{Key, Type}|Types]) ->
     makemap(addmap(Map, Key, Value, Type), Values, Types);
 makemap(Map, [Value|Values], [Key|Types]) ->
     makemap(addmap(Map, Key, Value, string), Values, Types).
-
 
 addmap(Map, _Key, <<"">>, _Type) ->
     Map;
@@ -443,6 +467,9 @@ trace_has_duration(Trace) ->
 
 trace_msg(TMap) ->
     maps:get(message, TMap, <<"">>).
+
+trace_name(TMap) ->
+    maps:get(name, TMap, <<"">>).
 
 trace_msg(TraceMap, Direction, Pattern) when is_binary(Pattern) ->
     trace_msg(TraceMap, Direction, [Pattern]);
