@@ -76,9 +76,10 @@ loop(I, Collector, {ok, Line}) ->
                 span_printed = false,
                 traceid = hex16(rand:uniform(16#ffffffffffffffff)),
                 localEndpoint = "nso",
-                vspans = #{},
-                current = #{},
-                stacks = #{}
+                vspans = #{},             % "virtual" spans
+                cspans = #{},             % spans currently working on
+                astacks = #{},            % annotation stack
+                pstacks = #{}             % parent stack
                }).
 
 start_collector(O) ->
@@ -91,7 +92,7 @@ stop_collector(#state{outfd = O} = State0) ->
                   State0, State0#state.vspans),
     print_nl(O, false),
     io:put_chars(O, "]\n"),
-    case maps:size(State#state.current) of
+    case maps:size(State#state.cspans) of
         0 -> ok;
         N -> io:format("~p unmatched start events left\n", [N])
     end,
@@ -124,14 +125,16 @@ handle_trace(Trace, S00) ->
             S1 = S0,
             ParentId = parent_id(Trace, Id, S1),
             Span = make_span(Trace, Id, ParentId, S1),
-            push_span(Key, Span, S1);
+            S2 = push_span(Key, Span, S1),
+            maybe_push_pstack(Id, Span, S2);
         {stop, Key} ->
             case pop_span(Key, S0) of
                 undefined ->
                     io:format("unmatched stop event: ~p\n", [trace_msg(Trace)]),
                     S0;
                 {Span, S1} ->
-                    print_span(add_stop(Trace, Span), S1)
+                    S2 = maybe_pop_pstack(Span, S1),
+                    print_span(add_stop(Trace, Span), S2)
             end;
         {annotation, Key} ->
             add_annotation_to_current(Key, Trace, S0)
@@ -189,31 +192,68 @@ vt_span(Trace, USpan, State) ->
     update(remoteEndpoint, USpan, remoteEndpoint, Span0).
 
 
-push_span(Key, Span, #state{current = C, stacks = Stacks} = State) ->
+push_span(Key, Span, #state{cspans = C, astacks = Stacks} = State) ->
     case maps:is_key(Key, C) of
         true ->  io:format("Duplicate key: ~p\n", [Key]);
         false -> ok
     end,
     SKey = stack_key(Key),
     Stack = maps:get(SKey, Stacks, []),
-    State#state{current = maps:put(Key, Span, C),
-                stacks = maps:put(SKey, [Key|Stack], Stacks)}.
+    State#state{cspans = maps:put(Key, Span, C),
+                astacks = maps:put(SKey, [Key|Stack], Stacks)}.
 
-pop_span(Key, #state{current = C, stacks = Stacks} = State) ->
+pop_span(Key, #state{cspans = C, astacks = AStacks} = State) ->
     case maps:take(Key, C) of
         {Span, New} ->
-            NewStacks =
-                maps:update_with(stack_key(Key), fun ([_|T]) -> T end, Stacks),
-            {Span, State#state{current = New, stacks = NewStacks}};
+            NewAStacks =
+                maps:update_with(stack_key(Key), fun ([_|T]) -> T end, AStacks),
+            {Span, State#state{cspans = New, astacks = NewAStacks}};
         error ->
             undefined
     end.
 
-add_annotation_to_current(AKey, Trace, #state{current=C, vspans=V} = State) ->
+maybe_push_pstack(Id, Span, #state{pstacks = PS} = State) ->
+    case is_new_parent(Span) of
+        true ->
+            Key = span_ut(Span),
+            NPS = maps:put(Key, [Id|maps:get(Key, PS, [])], PS),
+            State#state{pstacks = NPS};
+        false ->
+            State
+    end.
+
+is_new_parent(Span) ->
+    is_new_parent_name(maps:get(name, Span)).
+
+is_new_parent_name(<<"applying transaction">>) -> true;
+is_new_parent_name(<<"transforms and transaction hooks">>) -> true;
+is_new_parent_name(<<"validate phase">>) -> true;
+is_new_parent_name(<<"write-start phase">>) -> true;
+is_new_parent_name(<<"prepare phase">>) -> true;
+is_new_parent_name(<<"commit phase">>) -> true;
+is_new_parent_name(<<"abort phase">>) -> true;
+is_new_parent_name(_) -> false.
+
+
+maybe_pop_pstack(Span, #state{pstacks = PS} = State) ->
+    Key = span_ut(Span),
+    Id = maps:get(id, Span),
+    case maps:find(Key, PS) of
+        {ok, [Id|Ids]} ->
+            State#state{pstacks = maps:put(Key, Ids, PS)};
+        _ ->
+            State
+    end.
+
+span_ut(Span) ->
+    Tags = maps:get(tags, Span),
+    {maps:get(usid, Tags), maps:get(tid, Tags)}.
+
+add_annotation_to_current(AKey, Trace, #state{cspans=C, vspans=V} = State) ->
     UpdateF = fun (Span) -> add_annotation(Trace, Span) end,
-    case maps:get(stack_key(AKey), State#state.stacks, undefined) of
+    case maps:get(stack_key(AKey), State#state.astacks, undefined) of
         [Key|_] ->
-            State#state{current = maps:update_with(Key, UpdateF, C)};
+            State#state{cspans = maps:update_with(Key, UpdateF, C)};
         _ ->
             %% 'undefined' or [], orphaned add to transaction vspan
             Key = {musid(Trace), mtid(Trace)},
@@ -242,13 +282,15 @@ key(Trace) ->
 stack_key({U,T,_,D}) ->
     {U,T,D}.
 
-%% XXX
+%% First look in the pstack, if not there use top-level vspan for tid
 parent_id(Trace, _Id, State) ->
-    U = musid(Trace), T = mtid(Trace),
-    maps:get(id, maps:get({U,T}, State#state.vspans)).
-
-
-
+    Key = {musid(Trace), mtid(Trace)},
+    case maps:find(Key, State#state.pstacks) of
+        {ok, [Id|_]} ->
+            Id;
+        _ ->
+            maps:get(id, maps:get(Key, State#state.vspans))
+    end.
 
 print_span(Span, #state{outfd = O} = State) ->
     print_nl(O, State#state.span_printed),
@@ -299,13 +341,20 @@ make_span(Trace, Id, ParentId, State) ->
            name => trace_name(Trace),
            parentId => ParentId,
            id => Id,
-           %% kind => ???
-           %% kind => <<"CLIENT">>,
            timestamp => trace_ts(Trace),
            localEndpoint => local_endpoint(Trace, State),
            tags => maps:without([name, duration,timestamp], Trace)
           },
-    updatel([device,service], Trace, remoteEndpoint, serviceName, S0).
+    S1 = updatel([device,service], Trace, remoteEndpoint, serviceName, S0),
+    span_kind(Trace, S1).
+
+span_kind(Trace, Span) ->
+    case maps:is_key(device, Trace) of
+        true ->
+            Span#{kind => <<"CLIENT">>};
+        _ ->
+            Span#{kind => <<"SERVER">>}
+    end.
 
 trace_id(Trace, _State) ->
     %% State#state.traceid,
@@ -314,10 +363,14 @@ trace_id(Trace, _State) ->
 local_endpoint(Trace, State) ->
     case maps:find(subsystem, Trace) of
         {ok, Subsystem} ->
-            #{ serviceName => Subsystem };
+            #{ serviceName => concat([State#state.localEndpoint,".",
+                                      Subsystem]) };
         _ ->
             #{ serviceName => State#state.localEndpoint }
     end.
+
+concat(Strs) ->
+    unicode:characters_to_binary(Strs).
 
 update(Key1, Map1, Key2, Map2) ->
     case maps:find(Key1, Map1) of
