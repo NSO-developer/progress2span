@@ -76,7 +76,7 @@ loop(I, Collector, {ok, Line}) ->
                 span_printed = false,
                 traceid = hex16(rand:uniform(16#ffffffffffffffff)),
                 localEndpoint = "nso",
-                utmap = #{},
+                vspans = #{},
                 current = #{},
                 stacks = #{}
                }).
@@ -85,7 +85,10 @@ start_collector(O) ->
     io:put_chars(O, "["),
     collector_loop(#state{outfd = O}).
 
-stop_collector(#state{outfd = O} = State) ->
+stop_collector(#state{outfd = O} = State0) ->
+    State =
+        maps:fold(fun (_, VSpan, S0) -> print_span(VSpan, S0) end,
+                  State0, State0#state.vspans),
     print_nl(O, false),
     io:put_chars(O, "]\n"),
     case maps:size(State#state.current) of
@@ -113,14 +116,15 @@ collector_loop(State) ->
 %% span. Add the stop message as an annotation (so the result is
 %% saved)
 
-handle_trace(Trace, S0) ->
+handle_trace(Trace, S00) ->
+    S0 = save_vspans(Trace, S00),
     case classify(Trace) of
         {start, Key} ->
             Id = span_id(Trace),
-            State1 = update_utmap(Trace, Id, S0),
-            ParentId = parent_id(Trace, Id, State1),
-            Span = make_span(Trace, Id, ParentId, State1),
-            push_span(Key, Span, State1);
+            S1 = S0,
+            ParentId = parent_id(Trace, Id, S1),
+            Span = make_span(Trace, Id, ParentId, S1),
+            push_span(Key, Span, S1);
         {stop, Key} ->
             case pop_span(Key, S0) of
                 undefined ->
@@ -132,6 +136,58 @@ handle_trace(Trace, S0) ->
         {annotation, Key} ->
             add_annotation_to_current(Key, Trace, S0)
     end.
+
+save_vspans(Trace, #state{vspans = V} = State) ->
+    U = musid(Trace), T = mtid(Trace),
+    case maps:find(U, V) of
+        {ok, USpan} ->
+            case maps:is_key({U,T}, V) of
+                true ->
+                    State;
+                false ->
+                    NewVSpan = V#{{U,T} => vt_span(Trace, USpan, State)},
+                    State#state{vspans = NewVSpan}
+            end;
+        error ->
+            USpan = vu_span(Trace, State),
+            NewVSpan = V#{U => USpan, {U,T} => vt_span(Trace, USpan, State)},
+            State#state{vspans = NewVSpan}
+    end.
+
+vu_span(Trace, State) ->
+    TS = trace_ts(Trace),
+    Name = <<"user-session">>,
+    Id = span_id(musid(Trace),0,TS,Name,undefined),
+    Span0 =
+        #{
+          traceId => trace_id(Trace, State),
+          id => Id,
+          parentId => Id,
+          name => Name,
+          kind => <<"SERVER">>,
+          timestamp => TS,
+          tags => maps:with([usid,context,package], Trace),
+          localEndpoint => #{ serviceName => State#state.localEndpoint }
+         },
+    update(context, Trace, remoteEndpoint, serviceName, Span0).
+
+vt_span(Trace, USpan, State) ->
+    TS = trace_ts(Trace),
+    Name = <<"transaction">>,
+    Id = span_id(musid(Trace),mtid(Trace),TS,Name,undefined),
+    Span0 =
+        #{
+          traceId => trace_id(Trace, State),
+          id => Id,
+          parentId => maps:get(id, USpan),
+          name => Name,
+          kind => <<"SERVER">>,
+          timestamp => TS,
+          tags => maps:with([usid,tid,context,package], Trace),
+          localEndpoint => #{ serviceName => State#state.localEndpoint }
+         },
+    update(remoteEndpoint, USpan, remoteEndpoint, Span0).
+
 
 push_span(Key, Span, #state{current = C, stacks = Stacks} = State) ->
     case maps:is_key(Key, C) of
@@ -153,17 +209,15 @@ pop_span(Key, #state{current = C, stacks = Stacks} = State) ->
             undefined
     end.
 
-add_annotation_to_current(AKey, Trace, #state{current = C} = State) ->
+add_annotation_to_current(AKey, Trace, #state{current=C, vspans=V} = State) ->
+    UpdateF = fun (Span) -> add_annotation(Trace, Span) end,
     case maps:get(stack_key(AKey), State#state.stacks, undefined) of
-        undefined ->
-            io:format("dropping annotation: ~p\n", [trace_msg(Trace)]),
-            State;
-        [] ->
-            io:format("dropping annotation (): ~p\n", [trace_msg(Trace)]),
-            State;
         [Key|_] ->
-            UpdateF = fun (Span) -> add_annotation(Trace, Span) end,
-            State#state{current = maps:update_with(Key, UpdateF, C)}
+            State#state{current = maps:update_with(Key, UpdateF, C)};
+        _ ->
+            %% 'undefined' or [], orphaned add to transaction vspan
+            Key = {musid(Trace), mtid(Trace)},
+            State#state{vspans = maps:update_with(Key, UpdateF, V)}
     end.
 
 classify(Trace) ->
@@ -190,10 +244,9 @@ stack_key({U,T,_,D}) ->
 
 %% XXX
 parent_id(Trace, _Id, State) ->
-    case mtid(Trace) of
-        undefined -> maps:get({usid, musid(Trace)}, State#state.utmap);
-        Tid -> maps:get({tid,Tid}, State#state.utmap)
-    end.
+    U = musid(Trace), T = mtid(Trace),
+    maps:get(id, maps:get({U,T}, State#state.vspans)).
+
 
 
 
@@ -227,7 +280,7 @@ unquote(Str) ->
     Str.
 
 add_annotation(Trace, Span) ->
-    Annotation = #{timestamp => maps:get(timestamp, Trace),
+    Annotation = #{timestamp => trace_ts(Trace),
                    value => maps:get(message, Trace)},
     Annotations = [Annotation|maps:get(annotations, Span, [])],
     maps:put(annotations, Annotations, Span).
@@ -242,18 +295,21 @@ add_stop(Trace, Span) ->
 
 make_span(Trace, Id, ParentId, State) ->
     S0 = #{
-%           traceId => State#state.traceid,
-           traceId => hex16(musid(Trace)),
+           traceId => trace_id(Trace, State),
            name => trace_name(Trace),
            parentId => ParentId,
            id => Id,
            %% kind => ???
-           kind => <<"CLIENT">>,
-           timestamp => maps:get(timestamp, Trace),
+           %% kind => <<"CLIENT">>,
+           timestamp => trace_ts(Trace),
            localEndpoint => local_endpoint(Trace, State),
            tags => maps:without([name, duration,timestamp], Trace)
           },
     updatel([device,service], Trace, remoteEndpoint, serviceName, S0).
+
+trace_id(Trace, _State) ->
+    %% State#state.traceid,
+    hex16(musid(Trace)).
 
 local_endpoint(Trace, State) ->
     case maps:find(subsystem, Trace) of
@@ -263,20 +319,24 @@ local_endpoint(Trace, State) ->
             #{ serviceName => State#state.localEndpoint }
     end.
 
-%% update(Key1, Map1, Key2, Map2) ->
-%%     case maps:find(Key1, M) of
-%%         {ok, Value} ->
-%%             maps:put(Key2, Value, Map2);
-%%         error ->
-%%             Map2
-%%     end.
+update(Key1, Map1, Key2, Map2) ->
+    case maps:find(Key1, Map1) of
+        {ok, Value} ->
+            maps:put(Key2, Value, Map2);
+        error ->
+            Map2
+    end.
 
 updatel(Keys, Map1, Key2, Key3, Map2) ->
     foldlwhile(
-      fun (Key, Map) -> update(Key, Map, Key2, Key3, Map2) end,
+      fun (Key, Map) -> updateb(Key, Map, Key2, Key3, Map2) end,
       Map1, Keys).
 
 update(Key1, Map1, Key2, Key3, Map2) ->
+    {_, New} = updateb(Key1, Map1, Key2, Key3, Map2),
+    New.
+
+updateb(Key1, Map1, Key2, Key3, Map2) ->
     case maps:find(Key1, Map1) of
         {ok, Value} ->
             NewValue2 =
@@ -303,49 +363,22 @@ foldlwhile(F, Acc, [H|T]) ->
             Acc
     end.
 
-update_utmap(M, Id, #state{utmap = UTMap} = State) ->
-    State#state{utmap = update_utmap(musid(M), mtid(M), Id, UTMap)}.
-
 musid(M) ->
     maps:get(usid, M, undefined).
 mtid(M) ->
     maps:get(tid, M, undefined).
 
-%% If this is the first time we see this usid, save it's id and
-%% make others use it as parentID
-%%
-%% If this is the first time we see this tid, save it's id and
-%% make others use it as parentId
-update_utmap(U, T, Id, State) ->
-    case maps:is_key({tid, T}, State) of
-        false ->
-            case maps:is_key({usid,U}, State) of
-                %% false ->
-                %%     State#{{tid,T} => Id, {usid,U} => Id};
-                %% true ->
-                %%     State#{{tid,T} => Id}
-                false when T /= undefined ->
-                    State#{{tid,T} => Id, {usid,U} => Id};
-                false ->
-                    State#{{usid,U} => Id};
-                true ->
-                    State#{{tid,T} => Id}
-            end;
-        true ->
-            State
-    end.
-
-
 span_id(M) ->
-    TS = maps:get(timestamp, M), % - maps:get(duration, M, 0),
-    hexstr(binary:part(
-             hash_term({maps:get(usid, M),
-                        maps:get(tid, M),
-                        TS,
-                        trace_name(M),
-                        trace_device(M)
-                       }),
-             0, 8)).
+    TS = trace_ts(M), % - maps:get(duration, M, 0),
+    span_id(maps:get(usid, M),
+            maps:get(tid, M),
+            TS,
+            trace_name(M),
+            trace_device(M)).
+
+span_id(U, T, TS, Str1, Str2) ->
+    hexstr(binary:part(hash_term({U, T, TS, Str1, Str2}), 0, 8)).
+
 
 hex16(Integer) when is_integer(Integer) ->
     lists:flatten(io_lib:format("~16.16.0b", [Integer])).
@@ -508,6 +541,9 @@ trace_has_usid_and_tid(Trace) ->
 
 trace_has_duration(Trace) ->
     maps:is_key(duration, Trace).
+
+trace_ts(TMap) ->
+    maps:get(timestamp, TMap).
 
 trace_msg(TMap) ->
     maps:get(message, TMap, <<"">>).
