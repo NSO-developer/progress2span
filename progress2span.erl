@@ -117,28 +117,59 @@ collector_loop(State) ->
 %% span. Add the stop message as an annotation (so the result is
 %% saved)
 
-handle_trace(Trace, S00) ->
-    S0 = save_vspans(Trace, S00),
+handle_trace(Trace, S0) ->
+    S1 = save_vspans(Trace, S0),
     case classify(Trace) of
         {start, Key} ->
             Id = span_id(Trace),
-            S1 = S0,
             ParentId = parent_id(Trace, Id, S1),
             Span = make_span(Trace, Id, ParentId, S1),
-            S2 = push_span(Key, Span, S1),
-            maybe_push_pstack(Id, Span, S2);
+            maybe_push_pstack(Id, Span, push_span(Key, Span, S1));
         {stop, Key} ->
-            case pop_span(Key, S0) of
+            case pop_span(Key, S1) of
                 undefined ->
                     io:format("unmatched stop event: ~p\n", [trace_msg(Trace)]),
-                    S0;
-                {Span, S1} ->
-                    S2 = maybe_pop_pstack(Span, S1),
-                    print_span(add_stop(Trace, Span), S2)
+                    S1;
+                {Span, S2} ->
+                    S3 = maybe_pop_pstack(Span, S2),
+                    S4 = print_span(add_stop(Trace, Span), S3),
+                    xxx(Trace, S4)
             end;
         {annotation, Key} ->
-            add_annotation_to_current(Key, Trace, S0)
+            S2 = add_annotation_to_current(Key, Trace, S1),
+            yyy(Trace, S2)
     end.
+
+xxx(_, State) ->
+    State.
+%% xxx(Trace, State) ->
+%%     case trace_msg(Trace) of
+%%         <<"grabbing transaction lock ok">> ->
+%%             Key = {musid(Trace), mtid(Trace)},
+%%             ParentId = maps:get(id, maps:get(Key, State#state.vspans)),
+%%             LTrace = maps:put(name, <<"transaction lock">>,
+%%                               maps:without([name,message], Trace)),
+%%             Id = span_id(LTrace),
+%%             Span = make_span(LTrace, Id, ParentId, State),
+%%             CSpans = maps:put(key(LTrace), Span, State#state.cspans),
+%%             State#state{cspans = CSpans};
+%%         _ ->
+%%             State
+%%     end.
+
+yyy(_, State) ->
+    State.
+%% yyy(Trace, State) ->
+%%     case trace_msg(Trace) of
+%%         <<"releasing transaction lock">> ->
+%%             LTrace = maps:put(name, <<"transaction lock">>, Trace),
+%%             {Span, NewCSpans} = maps:take(key(LTrace), State#state.cspans),
+%%             State1 = State#state{cspans = NewCSpans},
+%%             Duration = trace_ts(LTrace) - trace_ts(Span),
+%%             print_span(maps:put(duration, Duration, Span), State1);
+%%         _ ->
+%%             State
+%%     end.
 
 save_vspans(Trace, #state{vspans = V} = State) ->
     U = musid(Trace), T = mtid(Trace),
@@ -239,8 +270,9 @@ maybe_pop_pstack(Span, #state{pstacks = PS} = State) ->
     Key = span_ut(Span),
     Id = maps:get(id, Span),
     case maps:find(Key, PS) of
-        {ok, [Id|Ids]} ->
-            State#state{pstacks = maps:put(Key, Ids, PS)};
+        {ok, Ids} ->
+            %% "pop" it even if it is further up the stack
+            State#state{pstacks = maps:put(Key, lists:delete(Id, Ids), PS)};
         _ ->
             State
     end.
