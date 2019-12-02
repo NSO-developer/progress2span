@@ -7,27 +7,91 @@ init() ->
     code:add_path("/Users/seb/Desktop/src/eparse/ejson/ebin"),
     application:start(ejson).
 
-main(Args) ->
-    {I, O} =
-        case Args of
-            [] ->
-                %% Is there really no other way?
-                {ok, F} = ropen("/dev/stdin"),
-                {F, standard_output};
-            [FName] ->
-                {ok, F} = ropen(FName),
-                {F, standard_output};
-            [InFile, OutFile] ->
-                {ok, F1} = ropen(InFile),
-                {ok, F2} = wopen(OutFile),
-                {F1, F2};
-            _ ->
-                io:format(standard_error, "Unknown args: ~p\n", [Args]),
-                erlang:halt(1)
-        end,
+-record(options, {
+                  %% Whether to make each usid a unique trace
+                  traceid = random_usid ::
+                    'usid'                % Use usid directly
+                  | 'random_usid'         % Use usid + random
+                  | 'random'              % Use a random number for whole file
+                  | {supplied, string()}, % Use supplied number for whole file
+                  lock_span = false :: boolean()
+                 }).
+
+main(Args0) ->
+    {Args, Options} = get_opt(Args0, #options{}),
+    io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
+    {I, O} = file_args(Args),
     init(),
-    process(I, O),
+    process(I, O, Options),
     erlang:halt(0).
+
+get_opt(Args, Options) ->
+    get_opt(Args, [], Options).
+
+get_opt(["-" ++ _ = Arg | Args], Remain, Options) ->
+    case Arg of
+        "-l" ->
+            get_opt(Args, Remain, Options#options{lock_span = true});
+        "-t" ++ What ->
+            TraceId =
+                case What of
+                    [] when Args /= [] ->
+                        {supplied, arg_hexstr(hd(Args))};
+                    "u" ->
+                        usid;
+                    "r" ->
+                        random;
+                    "ru" ->
+                        random_usid
+                end,
+            Args1 = case What of [] -> tl(Args); _ -> Args end,
+            get_opt(Args1, Remain, Options#options{traceid = TraceId});
+        _ ->
+            io:format(standard_error, "Unknown argument: ~p\n", [Arg]),
+            erlang:halt(1)
+    end;
+get_opt([Arg|Args], Remain, Options) ->
+    get_opt(Args, [Arg|Remain], Options);
+get_opt([], Remaining, Options) ->
+    {lists:reverse(Remaining), Options}.
+
+arg_hexstr(Str) ->
+    try
+        case
+            ((length(Str) == 16) orelse (length(Str) == 32))
+            andalso string:take(Str, "0123456789abcdef")
+        of
+            {Str, ""} ->
+                list_to_binary(Str);
+            _ ->
+                case string:to_integer(Str) of
+                    {I, _} when is_integer(I) ->
+                        hex16(I)
+                end
+        end
+    catch _:_ ->
+            io:format(standard_error, "Invalid trace id: ~s\n", [Str]),
+            erlang:halt(1)
+    end.
+
+
+file_args(Args) ->
+    case Args of
+        [] ->
+            %% Is there really no other way?
+            {ok, F} = ropen("/dev/stdin"),
+            {F, standard_output};
+        [FName] ->
+            {ok, F} = ropen(FName),
+            {F, standard_output};
+        [InFile, OutFile] ->
+            {ok, F1} = ropen(InFile),
+            {ok, F2} = wopen(OutFile),
+            {F1, F2};
+        _ ->
+            io:format(standard_error, "Unknown args: ~p\n", [Args]),
+            erlang:halt(1)
+    end.
 
 ropen(FileName) ->
     file:open(FileName, [read,raw,binary,read_ahead]).
@@ -35,10 +99,10 @@ ropen(FileName) ->
 wopen(FileName) ->
     file:open(FileName, [write]).
 
-process(I, O) ->
+process(I, O, Options) ->
     process_flag(trap_exit, true),
     try
-        Collector = spawn_link(fun () -> start_collector(O) end),
+        Collector = spawn_link(fun () -> start_collector(O, Options) end),
         loop(I, Collector, file:read_line(I)),
         receive
             {'EXIT', Collector, _} ->
@@ -72,9 +136,10 @@ loop(I, Collector, {ok, Line}) ->
 %% get all the spans generated in a single trace)
 %%
 -record(state, {
+                options = #options{} :: #options{},
                 outfd,
                 span_printed = false,
-                traceid = hex16(rand:uniform(16#ffffffffffffffff)),
+                traceid = rand:uniform(16#ffffffffffffffff),
                 localEndpoint = "nso",
                 vspans = #{},             % "virtual" spans
                 cspans = #{},             % spans currently working on
@@ -82,9 +147,9 @@ loop(I, Collector, {ok, Line}) ->
                 pstacks = #{}             % parent stack
                }).
 
-start_collector(O) ->
+start_collector(O, Options) ->
     io:put_chars(O, "["),
-    collector_loop(#state{outfd = O}).
+    collector_loop(#state{outfd = O, options = Options}).
 
 stop_collector(#state{outfd = O} = State0) ->
     State =
@@ -133,43 +198,41 @@ handle_trace(Trace, S0) ->
                 {Span, S2} ->
                     S3 = maybe_pop_pstack(Span, S2),
                     S4 = print_span(add_stop(Trace, Span), S3),
-                    xxx(Trace, S4)
+                    special_span_stop(Trace, S4)
             end;
         {annotation, Key} ->
             S2 = add_annotation_to_current(Key, Trace, S1),
-            yyy(Trace, S2)
+            special_span_annotation(Trace, S2)
     end.
 
-xxx(_, State) ->
-    State.
-%% xxx(Trace, State) ->
-%%     case trace_msg(Trace) of
-%%         <<"grabbing transaction lock ok">> ->
-%%             Key = {musid(Trace), mtid(Trace)},
-%%             ParentId = maps:get(id, maps:get(Key, State#state.vspans)),
-%%             LTrace = maps:put(name, <<"transaction lock">>,
-%%                               maps:without([name,message], Trace)),
-%%             Id = span_id(LTrace),
-%%             Span = make_span(LTrace, Id, ParentId, State),
-%%             CSpans = maps:put(key(LTrace), Span, State#state.cspans),
-%%             State#state{cspans = CSpans};
-%%         _ ->
-%%             State
-%%     end.
+special_span_stop(Trace, State) ->
+    case trace_msg(Trace) of
+        <<"grabbing transaction lock ok">> when
+              (State#state.options)#options.lock_span ->
+            Key = {musid(Trace), mtid(Trace)},
+            ParentId = maps:get(id, maps:get(Key, State#state.vspans)),
+            LTrace = maps:put(name, <<"transaction lock">>,
+                              maps:without([name,message], Trace)),
+            Id = span_id(LTrace),
+            Span = make_span(LTrace, Id, ParentId, State),
+            CSpans = maps:put(key(LTrace), Span, State#state.cspans),
+            State#state{cspans = CSpans};
+        _ ->
+            State
+    end.
 
-yyy(_, State) ->
-    State.
-%% yyy(Trace, State) ->
-%%     case trace_msg(Trace) of
-%%         <<"releasing transaction lock">> ->
-%%             LTrace = maps:put(name, <<"transaction lock">>, Trace),
-%%             {Span, NewCSpans} = maps:take(key(LTrace), State#state.cspans),
-%%             State1 = State#state{cspans = NewCSpans},
-%%             Duration = trace_ts(LTrace) - trace_ts(Span),
-%%             print_span(maps:put(duration, Duration, Span), State1);
-%%         _ ->
-%%             State
-%%     end.
+special_span_annotation(Trace, State) ->
+    case trace_msg(Trace) of
+        <<"releasing transaction lock">> when
+              (State#state.options)#options.lock_span ->
+            LTrace = maps:put(name, <<"transaction lock">>, Trace),
+            {Span, NewCSpans} = maps:take(key(LTrace), State#state.cspans),
+            State1 = State#state{cspans = NewCSpans},
+            Duration = trace_ts(LTrace) - trace_ts(Span),
+            print_span(maps:put(duration, Duration, Span), State1);
+        _ ->
+            State
+    end.
 
 save_vspans(Trace, #state{vspans = V} = State) ->
     U = musid(Trace), T = mtid(Trace),
@@ -388,8 +451,13 @@ span_kind(Trace, Span) ->
             Span#{kind => <<"SERVER">>}
     end.
 
-trace_id(Trace, _State) ->
-    %% State#state.traceid,
+trace_id(_Trace, #state{options = #options{traceid = {supplied, TraceId}}}) ->
+    TraceId;
+trace_id(_Trace, #state{options = #options{traceid = random}} = State) ->
+    hex16(State#state.traceid);
+trace_id(Trace, #state{options = #options{traceid = random_usid}} = State) ->
+    hex16((State#state.traceid + musid(Trace)) band 16#ffffffffffffffff);
+trace_id(Trace, #state{options = #options{traceid = usid}}) ->
     hex16(musid(Trace)).
 
 local_endpoint(Trace, State) ->
@@ -536,11 +604,10 @@ transform_message(Msg0) ->
            <<" result 'ok'">>]),
     Msg2 =
         lists:foldl(
-          fun (Pattern, Str) ->
-                  case string:split(Str, Pattern, leading) of
-                      [Str2] -> Str2;
-                      [<<>>, Str2] -> Str2;
-                      _ -> Str
+          fun (Prefix, Str) ->
+                  case string:prefix(Str, Prefix) of
+                      nomatch -> Str;
+                      NewStr -> NewStr
                   end
           end, Msg1,
           [<<"run ">>, <<"check ">>, <<"entering ">>, <<"leaving ">>]),
