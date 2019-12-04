@@ -8,18 +8,40 @@ init() ->
     application:start(ejson).
 
 -record(options, {
+                  %% Output debug info?
+                  info = info :: 'quiet' | 'info' | 'debug',
+
+                  %% Name of local NSO node
+                  localEndpoint = <<"NSO">>,
+
                   %% Whether to make each usid a unique trace
                   traceid = random_usid ::
                     'usid'                % Use usid directly
                   | 'random_usid'         % Use usid + random
                   | 'random'              % Use a random number for whole file
                   | {supplied, string()}, % Use supplied number for whole file
+
+                  %% Only include entries between these two timestamps (nyi)
+                  from = 0 :: non_neg_integer(),
+                  to = infinity :: non_neg_integer() | 'infinity',
+
+                  %% Include a span that represents the transaction log
                   lock_span = false :: boolean()
                  }).
 
+-define(info(F, A), case get(info) of
+                        quiet -> ok;
+                        _ -> io:format(standard_error, F, A)
+                    end).
+-define(debug(F, A),
+        case get(info) of
+            debug -> io:format(standard_error, F, A);
+            _ -> ok
+        end).
+
 main(Args0) ->
     {Args, Options} = get_opt(Args0, #options{}),
-    io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
+    %% io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
     {I, O} = file_args(Args),
     init(),
     process(I, O, Options),
@@ -32,6 +54,16 @@ get_opt(["-" ++ _ = Arg | Args], Remain, Options) ->
     case Arg of
         "-l" ->
             get_opt(Args, Remain, Options#options{lock_span = true});
+        "-d" ->
+            put(info, debug),
+            get_opt(Args, Remain, Options#options{info = debug});
+        "-q" ->
+            put(info, quiet),
+            get_opt(Args, Remain, Options#options{info = quiet});
+        "-h" when Args /= [] ->
+            Nodename = unicode:characters_to_binary(hd(Args)),
+            get_opt(tl(Args), Remain,
+                    Options#options{localEndpoint = Nodename});
         "-t" ++ What ->
             TraceId =
                 case What of
@@ -102,7 +134,11 @@ wopen(FileName) ->
 process(I, O, Options) ->
     process_flag(trap_exit, true),
     try
-        Collector = spawn_link(fun () -> start_collector(O, Options) end),
+        Collector =
+            spawn_link(fun () ->
+                               put(info, Options#options.info),
+                               start_collector(O, Options)
+                       end),
         loop(I, Collector, file:read_line(I)),
         receive
             {'EXIT', Collector, _} ->
@@ -140,7 +176,6 @@ loop(I, Collector, {ok, Line}) ->
                 outfd,
                 span_printed = false,
                 traceid = rand:uniform(16#ffffffffffffffff),
-                localEndpoint = "nso",
                 vspans = #{},             % "virtual" spans
                 cspans = #{},             % spans currently working on
                 astacks = #{},            % annotation stack
@@ -159,7 +194,8 @@ stop_collector(#state{outfd = O} = State0) ->
     io:put_chars(O, "]\n"),
     case maps:size(State#state.cspans) of
         0 -> ok;
-        N -> io:format("~p unmatched start events left\n", [N])
+        N -> ?info("~p unmatched start events left\n", [N]),
+             debug_print_state(State)
     end,
     exit(normal).
 
@@ -184,7 +220,7 @@ collector_loop(State) ->
 
 handle_trace(Trace, S0) ->
     S1 = save_vspans(Trace, S0),
-    case classify(Trace) of
+    case classify(Trace, S1) of
         {start, Key} ->
             Id = span_id(Trace),
             ParentId = parent_id(Trace, Id, S1),
@@ -193,7 +229,7 @@ handle_trace(Trace, S0) ->
         {stop, Key} ->
             case pop_span(Key, S1) of
                 undefined ->
-                    io:format("unmatched stop event: ~p\n", [trace_msg(Trace)]),
+                    ?info("unmatched stop event: ~p\n", [trace_msg(Trace)]),
                     S1;
                 {Span, S2} ->
                     S3 = maybe_pop_pstack(Span, S2),
@@ -202,7 +238,9 @@ handle_trace(Trace, S0) ->
             end;
         {annotation, Key} ->
             S2 = add_annotation_to_current(Key, Trace, S1),
-            special_span_annotation(Trace, S2)
+            special_span_annotation(Trace, S2);
+        {ignore, _} ->
+            S1
     end.
 
 special_span_stop(Trace, State) ->
@@ -226,13 +264,25 @@ special_span_annotation(Trace, State) ->
         <<"releasing transaction lock">> when
               (State#state.options)#options.lock_span ->
             LTrace = maps:put(name, <<"transaction lock">>, Trace),
-            {Span, NewCSpans} = maps:take(key(LTrace), State#state.cspans),
-            State1 = State#state{cspans = NewCSpans},
-            Duration = trace_ts(LTrace) - trace_ts(Span),
-            print_span(maps:put(duration, Duration, Span), State1);
+            case maps:take(key(LTrace), State#state.cspans) of
+                {Span, NewCSpans} ->
+                    State1 = State#state{cspans = NewCSpans},
+                    Duration = trace_ts(LTrace) - trace_ts(Span),
+                    print_span(maps:put(duration, Duration, Span), State1);
+                error ->
+                    ?info("unmatched transaction lock event: ~999p\n",
+                          [LTrace]),
+                    debug_print_state(State),
+                    State
+            end;
         _ ->
             State
     end.
+
+debug_print_state(#state{options = #options{info = debug}} = State) ->
+    ?debug("STATE:\n  ~p\n", [State]);
+debug_print_state(_) ->
+    ok.
 
 save_vspans(Trace, #state{vspans = V} = State) ->
     U = musid(Trace), T = mtid(Trace),
@@ -264,7 +314,7 @@ vu_span(Trace, State) ->
           kind => <<"SERVER">>,
           timestamp => TS,
           tags => maps:with([usid,context,package], Trace),
-          localEndpoint => #{ serviceName => State#state.localEndpoint }
+          localEndpoint => #{ serviceName => local_endpoint(State) }
          },
     update(context, Trace, remoteEndpoint, serviceName, Span0).
 
@@ -281,14 +331,14 @@ vt_span(Trace, USpan, State) ->
           kind => <<"SERVER">>,
           timestamp => TS,
           tags => maps:with([usid,tid,context,package], Trace),
-          localEndpoint => #{ serviceName => State#state.localEndpoint }
+          localEndpoint => #{ serviceName => local_endpoint(State) }
          },
     update(remoteEndpoint, USpan, remoteEndpoint, Span0).
 
 
 push_span(Key, Span, #state{cspans = C, astacks = Stacks} = State) ->
     case maps:is_key(Key, C) of
-        true ->  io:format("Duplicate key: ~p\n", [Key]);
+        true ->  ?info("Duplicate key: ~p\n", [Key]);
         false -> ok
     end,
     SKey = stack_key(Key),
@@ -355,17 +405,21 @@ add_annotation_to_current(AKey, Trace, #state{cspans=C, vspans=V} = State) ->
             State#state{vspans = maps:update_with(Key, UpdateF, V)}
     end.
 
-classify(Trace) ->
+classify(Trace, State) ->
     Type = trace_type(Trace),
+    TS = trace_ts(Trace),
     case trace_has_duration(Trace) of
+        _ when TS < State#state.options#options.from orelse
+               TS > State#state.options#options.to ->
+            ignore;
         true when Type == start ->
-            io:format("START MSG W DURATION:\n  ~999p\n", [Trace]);
+            ?info("START MSG W DURATION:\n  ~999p\n", [Trace]);
         true when Type == annotation ->
-            io:format("ANN MSG W DURATION:\n  ~999p\n", [Trace]);
+            ?info("ANN MSG W DURATION:\n  ~999p\n", [Trace]);
         false when Type == stop ->
-            io:format("STOP MSG W/O DURATION:\n  ~999p\n", [Trace]);
+            ?info("STOP MSG W/O DURATION:\n  ~999p\n", [Trace]);
         _D when Type == unknown ->
-            io:format("UNKNOWN (has_duration: ~p)\n  ~999p\n", [_D, Trace]);
+            ?info("UNKNOWN (has_duration: ~p)\n  ~999p\n", [_D, Trace]);
         _ ->
             ok
     end,
@@ -460,13 +514,15 @@ trace_id(Trace, #state{options = #options{traceid = random_usid}} = State) ->
 trace_id(Trace, #state{options = #options{traceid = usid}}) ->
     hex16(musid(Trace)).
 
+local_endpoint(State) ->
+    State#state.options#options.localEndpoint.
+
 local_endpoint(Trace, State) ->
     case maps:find(subsystem, Trace) of
         {ok, Subsystem} ->
-            #{ serviceName => concat([State#state.localEndpoint,".",
-                                      Subsystem]) };
+            #{ serviceName => concat([local_endpoint(State),".", Subsystem]) };
         _ ->
-            #{ serviceName => State#state.localEndpoint }
+            #{ serviceName => local_endpoint(State) }
     end.
 
 concat(Strs) ->
