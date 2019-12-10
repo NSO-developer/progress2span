@@ -3,10 +3,6 @@
 %% -compile(export_all).
 -export([main/1]).
 
-init() ->
-    code:add_path("/Users/seb/Desktop/src/eparse/ejson/ebin"),
-    application:start(ejson).
-
 -record(options, {
                   %% Output debug info?
                   info = info :: 'quiet' | 'info' | 'debug',
@@ -43,7 +39,6 @@ main(Args0) ->
     {Args, Options} = get_opt(Args0, #options{}),
     %% io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
     {I, O} = file_args(Args),
-    init(),
     process(I, O, Options),
     erlang:halt(0).
 
@@ -443,7 +438,7 @@ parent_id(Trace, _Id, State) ->
 
 print_span(Span, #state{outfd = O} = State) ->
     print_nl(O, State#state.span_printed),
-    io:put_chars(O, sejst:encode(Span)),
+    json(O, Span),
     State#state{span_printed = true}.
 
 print_nl(O, true) ->
@@ -590,7 +585,7 @@ span_id(U, T, TS, Str1, Str2) ->
 
 
 hex16(Integer) when is_integer(Integer) ->
-    lists:flatten(io_lib:format("~16.16.0b", [Integer])).
+    iolist_to_binary(io_lib:format("~16.16.0b", [Integer])).
 
 hash_term(Term) ->
     hash(term_to_binary(Term)).
@@ -682,6 +677,8 @@ makemap(Map, [Value|Values], [{Key, Type}|Types]) ->
 makemap(Map, [Value|Values], [Key|Types]) ->
     makemap(addmap(Map, Key, Value, string), Values, Types).
 
+addmap(Map, _Key, "", _Type) ->
+    Map;
 addmap(Map, _Key, <<"">>, _Type) ->
     Map;
 addmap(Map, Key, ValueStr, Type) ->
@@ -695,8 +692,10 @@ addmap(Map, Key, ValueStr, Type) ->
                 timestamp ->
                     calendar:rfc3339_to_system_time(binary_to_list(ValueStr),
                                                     [{unit,microsecond}]);
+                string when is_atom(ValueStr) ->
+                    atom_to_binary(ValueStr, utf8);
                 string ->
-                    ValueStr;
+                    iolist_to_binary(ValueStr);
                 F when is_function(Type, 1) ->
                     F(ValueStr)
             end
@@ -777,3 +776,58 @@ trace_msg(TraceMap, Direction, Patterns) ->
                       false
               end
       end, Patterns).
+
+%% ------------------------------------------------------------------------
+%% Tiny JSON encoder
+%%
+json(O, null)  -> emit(O, <<"null">>);
+json(O, false) -> emit(O, <<"false">>);
+json(O, true)  -> emit(O, <<"true">>);
+json(O, N) when is_integer(N) -> emit(O, integer_to_list(N));
+json(O, N) when is_float(N) ->   emit(O, float_to_list(N));
+
+json(O, Object) when map_size(Object) =:= 0 ->
+    emit(O, <<"{}">>);
+json(O, Object) when is_map(Object) ->
+    json_object(O, Object);
+json(O, Str) when is_atom(Str) ->
+    emit_string(O, atom_to_binary(Str, utf8));
+json(O, Str) when is_binary(Str) ->
+    emit_string(O, Str);
+json(O, []) ->
+    emit(O, <<"[]">>);
+json(O, Sequence) when is_list(Sequence) ->
+    json_sequence(O, Sequence).
+
+json_object(O, Map) ->
+    emit(O, <<"{">>),
+    maps:fold(
+      fun (Key, Value, CommaP) ->
+              emit(O, <<",">>, CommaP),
+              json(O, Key),
+              emit(O, <<":">>),
+              json(O, Value),
+              true
+      end, false, Map),
+    emit(O, <<"}">>).
+
+json_sequence(O, List) ->
+    emit(O, <<"[">>),
+    lists:foldl(
+      fun (Value, CommaP) ->
+              emit(O, <<",">>, CommaP),
+              json(O, Value),
+              true
+      end, false, List),
+    emit(O, <<"]">>).
+
+emit_string(O, Str) ->
+    emit(O, [$", string:replace(Str, "\"", "\\\"", all), $"]).
+
+emit(O, Chars) ->
+    io:put_chars(O, Chars).
+
+emit(_, _, false) ->
+    ok;
+emit(O, Chars, true) ->
+    io:put_chars(O, Chars).
