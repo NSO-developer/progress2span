@@ -46,13 +46,13 @@ main(Args0) ->
 check_version() ->
     {ok, StdLibVsnStr} = application:get_key(stdlib, vsn),
     case [list_to_integer(S) || S <- string:split(StdLibVsnStr, ["."], all)] of
-        [3, Mi | _] when (Mi >= 10) ->
+        [3, Mi | _] when (Mi >= 8) ->
             ok;
-        [Ma, Mi | _] when (Ma > 3) ->
+        [Ma, _Mi | _] when (Ma > 3) ->
             ok;
         _ ->
             io:format(standard_error,
-                      "Error: Need Erlang/OTP 22 or newer to run\n", []),
+                      "Error: Need Erlang/OTP 21 or newer to run\n", []),
             erlang:halt(1)
     end.
 
