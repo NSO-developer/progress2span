@@ -36,11 +36,25 @@
         end).
 
 main(Args0) ->
+    check_version(),
     {Args, Options} = get_opt(Args0, #options{}),
     %% io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
     {I, O} = file_args(Args),
     process(I, O, Options),
     erlang:halt(0).
+
+check_version() ->
+    {ok, StdLibVsnStr} = application:get_key(stdlib, vsn),
+    case [list_to_integer(S) || S <- string:split(StdLibVsnStr, ["."], all)] of
+        [3, Mi | _] when (Mi >= 10) ->
+            ok;
+        [Ma, Mi | _] when (Ma > 3) ->
+            ok;
+        _ ->
+            io:format(standard_error,
+                      "Error: Need Erlang/OTP 22 or newer to run\n", []),
+            erlang:halt(1)
+    end.
 
 get_opt(Args, Options) ->
     get_opt(Args, [], Options).
@@ -700,6 +714,9 @@ addmap(Map, Key, ValueStr, Type) ->
                     F(ValueStr)
             end
         catch _:_ ->
+                io:format(standard_error,
+                          "Warning: failed to convert \"~s\" to ~p\n",
+                          [ValueStr, Type]),
                 ValueStr
         end,
     Map#{Key => Value}.
