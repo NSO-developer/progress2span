@@ -1,0 +1,32 @@
+# Progress -> Span
+
+This script can convert progress traces taken from NSO and convert them to trace spans which can be consumed by tools like [Zipkin](https://zipkin.io)
+
+
+# Prerequisites
+
+## Zipkin
+
+You can run Zipkin in a docker container, or from a standalone Java jar, as documented here https://zipkin.io/pages/quickstart.html
+
+If you are brave you can just do
+
+    make zipkin.jar
+
+
+## Erlang
+
+You need a fairly recent version of [Erlang](https://erlang.org/) (Erlang/OTP 21 or newer) in order to run the script. Note that this is newer than what is shipped with any current NSO release, so you will have to install a version of Erlang locally. For example on MacOS using [MacPorts](https://www.macports.org):
+
+    port install erlang
+
+or using [Homebrew](https://brew.sh)
+
+    brew install erlang
+
+On Ubuntu and others:
+
+    apt install erlang
+
+On some distributions you get too old releases, in that case you can [download a more recent and pre-built Erlang package from Erlang Solutions](https://www.erlang-solutions.com/resources/download.html).
+
