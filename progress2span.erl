@@ -148,7 +148,18 @@ process(I, O, Options) ->
                                put(info, Options#options.info),
                                start_collector(O, Options)
                        end),
-        loop(I, Collector, file:read_line(I)),
+        Fn =
+            fun (eof) ->
+                    Collector ! eof;
+                (Line) ->
+                    case read_progress_csv(Line) of
+                        empty ->
+                            ok;
+                        PMap ->
+                            Collector ! {progress, PMap}
+                    end
+            end,
+        loop(I, Fn, file:read_line(I)),
         receive
             {'EXIT', Collector, _} ->
                 ok
@@ -158,18 +169,49 @@ process(I, O, Options) ->
         file:close(O)
     end.
 
-loop(_I, Collector, eof) ->
-    Collector ! eof,
+loop(_I, Fn, eof) ->
+    Fn(eof),
     ok;
-loop(I, Collector, {ok, Line}) ->
-    case read_progress_csv(Line) of
-        empty ->
-            ok;
-        PMap ->
-            Collector ! {progress, PMap}
-    end,
-    loop(I, Collector, file:read_line(I)).
+loop(I, Fn, {ok, Line}) ->
+    Fn(Line),
+    loop(I, Fn, file:read_line(I)).
 
+
+-include_lib("kernel/include/file.hrl").
+
+follow(FileName, Fn) ->
+    case ropen(FileName) of
+        {ok, Fd} ->
+            {ok, Info} = file:read_file_info(FileName),
+            follow(Fd, Info, FileName, Fn);
+        _X ->
+            timer:sleep(250),
+            follow(FileName, Fn)
+    end.
+
+follow(Fd, Info, FileName, Fn) ->
+    case file:read_line(Fd) of
+        {ok, Line} ->
+            Fn(Line),
+            follow(Fd, Info, FileName, Fn);
+        eof ->
+            {ok, Pos} = file:position(Fd, cur),
+            case file:read_file_info(FileName) of
+                {ok, NI} when
+                      NI#file_info.size == Pos andalso
+                      NI#file_info.minor_device == Info#file_info.minor_device
+                      andalso
+                      NI#file_info.major_device == Info#file_info.major_device
+                      andalso
+                      NI#file_info.inode == Info#file_info.inode
+                      ->
+                    timer:sleep(250),
+                    follow(Fd, Info, FileName, Fn);
+                _X ->
+                    file:close(Fd),
+                    follow(FileName, Fn)
+            end
+    end.
 
 %% What is a Trace? It should probably be all the activities that are
 %% initiated by an interaction with a northbound api. For example a
