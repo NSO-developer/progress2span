@@ -1,0 +1,1442 @@
+[
+   {
+      "kind" : "CLIENT",
+      "id" : "2587a3617c3f3323",
+      "timestamp" : 1582644246096000,
+      "tags" : {
+         "subsystem" : "ncs",
+         "message" : "taking device lock...",
+         "tid" : 45,
+         "context" : "cli",
+         "device" : "ios1",
+         "usid" : 41
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "annotations" : [
+         {
+            "timestamp" : 1582644246097000,
+            "value" : "taking device lock ok"
+         }
+      ],
+      "duration" : 1,
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "taking device lock",
+      "parentId" : "f019edb858cbcdac"
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "parentId" : "fd134bc46cdf70a4",
+      "name" : "taking device lock",
+      "annotations" : [
+         {
+            "timestamp" : 1582644246099000,
+            "value" : "taking device lock ok"
+         }
+      ],
+      "duration" : 2000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "id" : "c31608dec7215b6d",
+      "kind" : "CLIENT",
+      "tags" : {
+         "message" : "taking device lock...",
+         "subsystem" : "ncs",
+         "context" : "cli",
+         "tid" : 44,
+         "device" : "ios0",
+         "usid" : 41
+      },
+      "timestamp" : 1582644246096000
+   },
+   {
+      "annotations" : [
+         {
+            "timestamp" : 1582644247473000,
+            "value" : "connecting ok"
+         }
+      ],
+      "duration" : 497000,
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "connecting",
+      "parentId" : "f019edb858cbcdac",
+      "id" : "05a109c82b96ee7d",
+      "kind" : "CLIENT",
+      "timestamp" : 1582644246984000,
+      "tags" : {
+         "usid" : 41,
+         "device" : "ios1",
+         "device-phase" : "connect",
+         "tid" : 45,
+         "context" : "cli",
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "connecting..."
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      }
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "92176c881fb67bfd",
+      "tags" : {
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "connecting...",
+         "device-phase" : "connect",
+         "tid" : 44,
+         "context" : "cli",
+         "usid" : 41,
+         "device" : "ios0"
+      },
+      "timestamp" : 1582644246983000,
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "parentId" : "fd134bc46cdf70a4",
+      "name" : "connecting",
+      "annotations" : [
+         {
+            "timestamp" : 1582644247474000,
+            "value" : "connecting ok"
+         }
+      ],
+      "duration" : 497000
+   },
+   {
+      "tags" : {
+         "device" : "ios0",
+         "usid" : 41,
+         "tid" : 44,
+         "device-phase" : "connect",
+         "context" : "cli",
+         "subsystem" : "ncs",
+         "message" : "device connect..."
+      },
+      "timestamp" : 1582644246113000,
+      "id" : "fb968a0cd37f03e6",
+      "kind" : "CLIENT",
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "duration" : 1649000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644247763000,
+            "value" : "device connect ok"
+         },
+         {
+            "value" : "send NED is-alive",
+            "timestamp" : 1582644247761000
+         },
+         {
+            "timestamp" : 1582644246125000,
+            "value" : "send NED connect"
+         }
+      ],
+      "parentId" : "fd134bc46cdf70a4",
+      "name" : "device connect",
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      }
+   },
+   {
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "device connect",
+      "parentId" : "f019edb858cbcdac",
+      "annotations" : [
+         {
+            "value" : "device connect ok",
+            "timestamp" : 1582644247843000
+         },
+         {
+            "timestamp" : 1582644247841000,
+            "value" : "send NED is-alive"
+         },
+         {
+            "value" : "send NED connect",
+            "timestamp" : 1582644246125000
+         }
+      ],
+      "duration" : 1729000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "id" : "b7ef82e3cd08e740",
+      "kind" : "CLIENT",
+      "timestamp" : 1582644246113000,
+      "tags" : {
+         "context" : "cli",
+         "device-phase" : "connect",
+         "tid" : 45,
+         "usid" : 41,
+         "device" : "ios1",
+         "message" : "device connect...",
+         "subsystem" : "ncs"
+      }
+   },
+   {
+      "name" : "reading config",
+      "parentId" : "fd134bc46cdf70a4",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "duration" : 589000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644248453000,
+            "value" : "reading config ok"
+         }
+      ],
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "timestamp" : 1582644247864000,
+      "tags" : {
+         "context" : "cli",
+         "tid" : 44,
+         "device-phase" : "show",
+         "usid" : 41,
+         "device" : "ios0",
+         "message" : "reading config...",
+         "package" : "cisco-ios-cli-6.45",
+         "subsystem" : "ncs"
+      },
+      "id" : "b4cd9ad0aaabcf4b",
+      "kind" : "CLIENT"
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "4e4b3cb2130810b8",
+      "tags" : {
+         "usid" : 41,
+         "device" : "ios0",
+         "tid" : 44,
+         "device-phase" : "show",
+         "context" : "cli",
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "extended parsing..."
+      },
+      "timestamp" : 1582644248473000,
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "parentId" : "fd134bc46cdf70a4",
+      "name" : "extended parsing",
+      "annotations" : [
+         {
+            "value" : "extended parsing ok",
+            "timestamp" : 1582644248621000
+         }
+      ],
+      "duration" : 148000
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "tags" : {
+         "usid" : 41,
+         "device" : "ios0",
+         "device-phase" : "show",
+         "tid" : 44,
+         "context" : "cli",
+         "subsystem" : "ncs",
+         "message" : "device show..."
+      },
+      "timestamp" : 1582644247763000,
+      "kind" : "CLIENT",
+      "id" : "caded0ff60729228",
+      "parentId" : "fd134bc46cdf70a4",
+      "name" : "device show",
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "duration" : 858000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644248622000,
+            "value" : "device show ok"
+         },
+         {
+            "timestamp" : 1582644247862000,
+            "value" : "send NED show"
+         }
+      ]
+   },
+   {
+      "timestamp" : 1582644247935000,
+      "tags" : {
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "reading config...",
+         "usid" : 41,
+         "device" : "ios1",
+         "device-phase" : "show",
+         "tid" : 45,
+         "context" : "cli"
+      },
+      "kind" : "CLIENT",
+      "id" : "af5ca936880cd49c",
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "duration" : 688000,
+      "annotations" : [
+         {
+            "value" : "reading config ok",
+            "timestamp" : 1582644248625000
+         }
+      ],
+      "name" : "reading config",
+      "parentId" : "f019edb858cbcdac",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "parentId" : "f019edb858cbcdac",
+      "name" : "extended parsing",
+      "annotations" : [
+         {
+            "value" : "extended parsing ok",
+            "timestamp" : 1582644248710000
+         }
+      ],
+      "duration" : 76000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "cf364ee4f67e7c4d",
+      "tags" : {
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "extended parsing...",
+         "usid" : 41,
+         "device" : "ios1",
+         "tid" : 45,
+         "device-phase" : "show",
+         "context" : "cli"
+      },
+      "timestamp" : 1582644248634000
+   },
+   {
+      "id" : "6afddbf7dfd46ea8",
+      "kind" : "CLIENT",
+      "tags" : {
+         "subsystem" : "ncs",
+         "message" : "device show...",
+         "device-phase" : "show",
+         "tid" : 45,
+         "context" : "cli",
+         "device" : "ios1",
+         "usid" : 41
+      },
+      "timestamp" : 1582644247843000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "annotations" : [
+         {
+            "timestamp" : 1582644248711000,
+            "value" : "device show ok"
+         },
+         {
+            "value" : "send NED show",
+            "timestamp" : 1582644247933000
+         }
+      ],
+      "duration" : 867000,
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "parentId" : "f019edb858cbcdac",
+      "name" : "device show"
+   },
+   {
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "reading config",
+      "parentId" : "fd134bc46cdf70a4",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249083000,
+            "value" : "reading config ok"
+         }
+      ],
+      "duration" : 450000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "id" : "3ded79aa2dfe283f",
+      "kind" : "CLIENT",
+      "timestamp" : 1582644248634000,
+      "tags" : {
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "reading config...",
+         "tid" : 44,
+         "device-phase" : "get-trans-id",
+         "context" : "cli",
+         "device" : "ios0",
+         "usid" : 41
+      }
+   },
+   {
+      "timestamp" : 1582644248632000,
+      "tags" : {
+         "subsystem" : "ncs",
+         "message" : "device get-trans-id...",
+         "tid" : 44,
+         "device-phase" : "get-trans-id",
+         "context" : "cli",
+         "device" : "ios0",
+         "usid" : 41
+      },
+      "kind" : "CLIENT",
+      "id" : "b1c6cd9176ed3ef4",
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "duration" : 457000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249089000,
+            "value" : "device get-trans-id ok"
+         },
+         {
+            "value" : "send NED get-trans-id",
+            "timestamp" : 1582644248632000
+         }
+      ],
+      "name" : "device get-trans-id",
+      "parentId" : "fd134bc46cdf70a4",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "duration" : 4000,
+      "tags" : {
+         "message" : "run transforms and transaction hooks...",
+         "context" : "cli",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "timestamp" : 1582644249090000,
+      "id" : "a457b6ffbc442ea3",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "value" : "run transforms and transaction hooks done",
+            "timestamp" : 1582644249095000
+         }
+      ],
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "transforms and transaction hooks",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "tags" : {
+         "usid" : 41,
+         "tid" : 44,
+         "message" : "run pre-trans-lock service callbacks...",
+         "context" : "cli"
+      },
+      "duration" : 4000,
+      "timestamp" : 1582644249090000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249095000,
+            "value" : "run pre-trans-lock service callbacks done"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "ec0d790d6dc2287b",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "pre-trans-lock service callbacks",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "kind" : "SERVER",
+      "id" : "053007588532b9d7",
+      "annotations" : [
+         {
+            "value" : "grabbing transaction lock ok",
+            "timestamp" : 1582644249097000
+         }
+      ],
+      "timestamp" : 1582644249095000,
+      "duration" : 1000,
+      "tags" : {
+         "usid" : 41,
+         "message" : "grabbing transaction lock...",
+         "context" : "cli",
+         "tid" : 44
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "grabbing transaction lock",
+      "parentId" : "a5ddeb65e2bf1ddd"
+   },
+   {
+      "timestamp" : 1582644249097000,
+      "duration" : 1,
+      "tags" : {
+         "usid" : 41,
+         "tid" : 44,
+         "message" : "creating rollback file...",
+         "context" : "cli"
+      },
+      "annotations" : [
+         {
+            "timestamp" : 1582644249097000,
+            "value" : "creating rollback file ok"
+         }
+      ],
+      "id" : "b0f536f818c3f145",
+      "kind" : "SERVER",
+      "name" : "creating rollback file",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "duration" : 4000,
+      "tags" : {
+         "message" : "run transforms and transaction hooks...",
+         "context" : "cli",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "timestamp" : 1582644249097000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249102000,
+            "value" : "run transforms and transaction hooks done"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "ab92b4caed88d6a9",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "transforms and transaction hooks",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "duration" : 9000,
+      "tags" : {
+         "message" : "mark inactive...",
+         "context" : "cli",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "timestamp" : 1582644249102000,
+      "annotations" : [
+         {
+            "value" : "mark inactive done",
+            "timestamp" : 1582644249112000
+         }
+      ],
+      "id" : "e17c4e8c513d85cc",
+      "kind" : "SERVER",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "mark inactive",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "timestamp" : 1582644249112000,
+      "duration" : 7000,
+      "tags" : {
+         "tid" : 44,
+         "context" : "cli",
+         "message" : "pre validate...",
+         "usid" : 41
+      },
+      "id" : "fdf2eb8f52933ffe",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249119000,
+            "value" : "pre validate done"
+         }
+      ],
+      "name" : "pre validate",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "timestamp" : 1582644249119000,
+      "duration" : 10000,
+      "tags" : {
+         "tid" : 44,
+         "message" : "run validation over the changeset...",
+         "context" : "cli",
+         "usid" : 41
+      },
+      "annotations" : [
+         {
+            "timestamp" : 1582644249129000,
+            "value" : "run validation over the changeset done"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "4dbe1af5d8f22fb8",
+      "name" : "validation over the changeset",
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "dependency-triggered validation",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249130000,
+            "value" : "run dependency-triggered validation done"
+         }
+      ],
+      "id" : "d7c308bc4e253000",
+      "kind" : "SERVER",
+      "duration" : 1,
+      "tags" : {
+         "message" : "run dependency-triggered validation...",
+         "context" : "cli",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "timestamp" : 1582644249130000
+   },
+   {
+      "annotations" : [
+         {
+            "timestamp" : 1582644249130000,
+            "value" : "check configuration policies done"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "5e3b3ac6a3566075",
+      "tags" : {
+         "usid" : 41,
+         "tid" : 44,
+         "context" : "cli",
+         "message" : "check configuration policies..."
+      },
+      "duration" : 1,
+      "timestamp" : 1582644249130000,
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "parentId" : "a5ddeb65e2bf1ddd",
+      "name" : "configuration policies"
+   },
+   {
+      "timestamp" : 1582644249090000,
+      "duration" : 40000,
+      "tags" : {
+         "phase" : "validate",
+         "usid" : 41,
+         "message" : "entering validate phase...",
+         "context" : "cli",
+         "tid" : 44
+      },
+      "kind" : "SERVER",
+      "id" : "a5ddeb65e2bf1ddd",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249130000,
+            "value" : "leaving validate phase"
+         }
+      ],
+      "name" : "validate phase",
+      "parentId" : "d0f5da4874d4fb9e",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      }
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "parentId" : "07b581e2fa1e26d4",
+      "name" : "data kickers",
+      "id" : "23aae811dc547eb3",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249130000,
+            "value" : "check data kickers done"
+         }
+      ],
+      "tags" : {
+         "context" : "cli",
+         "message" : "check data kickers...",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "duration" : 1,
+      "timestamp" : 1582644249130000
+   },
+   {
+      "tags" : {
+         "phase" : "write-start",
+         "usid" : 41,
+         "tid" : 44,
+         "message" : "entering write-start phase...",
+         "context" : "cli"
+      },
+      "duration" : 9000,
+      "timestamp" : 1582644249130000,
+      "id" : "07b581e2fa1e26d4",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249140000,
+            "value" : "leaving write-start phase"
+         }
+      ],
+      "parentId" : "d0f5da4874d4fb9e",
+      "name" : "write-start phase",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "parentId" : "d0f5da4874d4fb9e",
+      "name" : "prepare phase",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "tags" : {
+         "phase" : "prepare",
+         "usid" : 41,
+         "tid" : 44,
+         "message" : "entering prepare phase...",
+         "context" : "cli"
+      },
+      "duration" : 2000,
+      "timestamp" : 1582644249140000,
+      "kind" : "SERVER",
+      "id" : "0f2c9b1617e7dc8e",
+      "annotations" : [
+         {
+            "value" : "leaving prepare phase",
+            "timestamp" : 1582644249143000
+         }
+      ]
+   },
+   {
+      "parentId" : "d0f5da4874d4fb9e",
+      "name" : "commit phase",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "duration" : 12000,
+      "tags" : {
+         "tid" : 44,
+         "message" : "entering commit phase...",
+         "context" : "cli",
+         "phase" : "commit",
+         "usid" : 41
+      },
+      "timestamp" : 1582644249143000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249155000,
+            "value" : "leaving commit phase"
+         },
+         {
+            "value" : "releasing transaction lock",
+            "timestamp" : 1582644249155000
+         },
+         {
+            "timestamp" : 1582644249154000,
+            "value" : "all commit subscription notifications acknowledged"
+         },
+         {
+            "timestamp" : 1582644249150000,
+            "value" : "delivering commit subscription notifications at prio 1"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "217c51eba01a0ff6"
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "name" : "applying transaction",
+      "parentId" : "fd134bc46cdf70a4",
+      "id" : "d0f5da4874d4fb9e",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "value" : "applying transaction done",
+            "timestamp" : 1582644249156000
+         }
+      ],
+      "timestamp" : 1582644249090000,
+      "duration" : 65000,
+      "tags" : {
+         "context" : "cli",
+         "message" : "applying transaction...",
+         "tid" : 44,
+         "usid" : 41
+      }
+   },
+   {
+      "timestamp" : 1582644246096000,
+      "tags" : {
+         "usid" : 41,
+         "device" : "ios0",
+         "context" : "cli",
+         "tid" : 44,
+         "message" : "sync-from...",
+         "subsystem" : "ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "c4f26e2ca4146fd5",
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "duration" : 3061000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249157000,
+            "value" : "sync-from ok"
+         },
+         {
+            "timestamp" : 1582644249156000,
+            "value" : "releasing device lock"
+         }
+      ],
+      "name" : "sync-from",
+      "parentId" : "fd134bc46cdf70a4",
+      "remoteEndpoint" : {
+         "serviceName" : "ios0"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "id" : "7701a64a26a62d33",
+      "kind" : "CLIENT",
+      "tags" : {
+         "subsystem" : "ncs",
+         "package" : "cisco-ios-cli-6.45",
+         "message" : "reading config...",
+         "usid" : 41,
+         "device" : "ios1",
+         "tid" : 45,
+         "device-phase" : "get-trans-id",
+         "context" : "cli"
+      },
+      "timestamp" : 1582644248722000,
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "parentId" : "f019edb858cbcdac",
+      "name" : "reading config",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249169000,
+            "value" : "reading config ok"
+         }
+      ],
+      "duration" : 446000
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "parentId" : "f019edb858cbcdac",
+      "name" : "device get-trans-id",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249172000,
+            "value" : "device get-trans-id ok"
+         },
+         {
+            "timestamp" : 1582644248720000,
+            "value" : "send NED get-trans-id"
+         }
+      ],
+      "duration" : 452000,
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "a2fa192dab429723",
+      "tags" : {
+         "tid" : 45,
+         "device-phase" : "get-trans-id",
+         "context" : "cli",
+         "device" : "ios1",
+         "usid" : 41,
+         "subsystem" : "ncs",
+         "message" : "device get-trans-id..."
+      },
+      "timestamp" : 1582644248720000
+   },
+   {
+      "duration" : 2000,
+      "tags" : {
+         "tid" : 45,
+         "context" : "cli",
+         "message" : "run transforms and transaction hooks...",
+         "usid" : 41
+      },
+      "timestamp" : 1582644249173000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249176000,
+            "value" : "run transforms and transaction hooks done"
+         }
+      ],
+      "id" : "1051caa7cc9b453d",
+      "kind" : "SERVER",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "name" : "transforms and transaction hooks",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "annotations" : [
+         {
+            "value" : "run pre-trans-lock service callbacks done",
+            "timestamp" : 1582644249176000
+         }
+      ],
+      "id" : "d8f2a9b8a03bad3c",
+      "kind" : "SERVER",
+      "duration" : 2000,
+      "tags" : {
+         "usid" : 41,
+         "message" : "run pre-trans-lock service callbacks...",
+         "context" : "cli",
+         "tid" : 45
+      },
+      "timestamp" : 1582644249173000,
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "name" : "pre-trans-lock service callbacks"
+   },
+   {
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "parentId" : "9f8f5e2ae19cf46c",
+      "name" : "grabbing transaction lock",
+      "annotations" : [
+         {
+            "value" : "grabbing transaction lock ok",
+            "timestamp" : 1582644249177000
+         }
+      ],
+      "id" : "22cdf4968f503c78",
+      "kind" : "SERVER",
+      "tags" : {
+         "tid" : 45,
+         "context" : "cli",
+         "message" : "grabbing transaction lock...",
+         "usid" : 41
+      },
+      "duration" : 1000,
+      "timestamp" : 1582644249176000
+   },
+   {
+      "name" : "creating rollback file",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "timestamp" : 1582644249177000,
+      "tags" : {
+         "tid" : 45,
+         "message" : "creating rollback file...",
+         "context" : "cli",
+         "usid" : 41
+      },
+      "duration" : 1,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249177000,
+            "value" : "creating rollback file ok"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "d40d0568d4d89302"
+   },
+   {
+      "id" : "1e5568e1c5d728e8",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "value" : "run transforms and transaction hooks done",
+            "timestamp" : 1582644249181000
+         }
+      ],
+      "timestamp" : 1582644249177000,
+      "duration" : 3000,
+      "tags" : {
+         "tid" : 45,
+         "message" : "run transforms and transaction hooks...",
+         "context" : "cli",
+         "usid" : 41
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "transforms and transaction hooks",
+      "parentId" : "9f8f5e2ae19cf46c"
+   },
+   {
+      "timestamp" : 1582644249181000,
+      "duration" : 6000,
+      "tags" : {
+         "context" : "cli",
+         "message" : "mark inactive...",
+         "tid" : 45,
+         "usid" : 41
+      },
+      "id" : "238a1a6aaad34dc0",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249187000,
+            "value" : "mark inactive done"
+         }
+      ],
+      "name" : "mark inactive",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "kind" : "SERVER",
+      "id" : "4e2833e88a4db56a",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249195000,
+            "value" : "pre validate done"
+         }
+      ],
+      "duration" : 7000,
+      "tags" : {
+         "tid" : 45,
+         "context" : "cli",
+         "message" : "pre validate...",
+         "usid" : 41
+      },
+      "timestamp" : 1582644249187000,
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "name" : "pre validate"
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "validation over the changeset",
+      "parentId" : "9f8f5e2ae19cf46c",
+      "annotations" : [
+         {
+            "value" : "run validation over the changeset done",
+            "timestamp" : 1582644249206000
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "1d26bfa37830b0cb",
+      "timestamp" : 1582644249195000,
+      "tags" : {
+         "message" : "run validation over the changeset...",
+         "context" : "cli",
+         "tid" : 45,
+         "usid" : 41
+      },
+      "duration" : 10000
+   },
+   {
+      "kind" : "SERVER",
+      "id" : "877a084a4529e572",
+      "annotations" : [
+         {
+            "value" : "run dependency-triggered validation done",
+            "timestamp" : 1582644249206000
+         }
+      ],
+      "duration" : 1,
+      "tags" : {
+         "tid" : 45,
+         "message" : "run dependency-triggered validation...",
+         "context" : "cli",
+         "usid" : 41
+      },
+      "timestamp" : 1582644249206000,
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "parentId" : "9f8f5e2ae19cf46c",
+      "name" : "dependency-triggered validation"
+   },
+   {
+      "id" : "b6402fe29e53f0a8",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "timestamp" : 1582644249206000,
+            "value" : "check configuration policies done"
+         }
+      ],
+      "timestamp" : 1582644249206000,
+      "duration" : 1,
+      "tags" : {
+         "message" : "check configuration policies...",
+         "context" : "cli",
+         "tid" : 45,
+         "usid" : 41
+      },
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "name" : "configuration policies",
+      "parentId" : "9f8f5e2ae19cf46c"
+   },
+   {
+      "kind" : "SERVER",
+      "id" : "9f8f5e2ae19cf46c",
+      "annotations" : [
+         {
+            "value" : "leaving validate phase",
+            "timestamp" : 1582644249206000
+         }
+      ],
+      "timestamp" : 1582644249173000,
+      "tags" : {
+         "phase" : "validate",
+         "usid" : 41,
+         "message" : "entering validate phase...",
+         "context" : "cli",
+         "tid" : 45
+      },
+      "duration" : 33000,
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "validate phase",
+      "parentId" : "5dbad3272d824764"
+   },
+   {
+      "id" : "a08303dd294826fc",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "value" : "check data kickers done",
+            "timestamp" : 1582644249207000
+         }
+      ],
+      "timestamp" : 1582644249207000,
+      "tags" : {
+         "message" : "check data kickers...",
+         "context" : "cli",
+         "tid" : 45,
+         "usid" : 41
+      },
+      "duration" : 1,
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "name" : "data kickers",
+      "parentId" : "9e8744a372f309fb"
+   },
+   {
+      "parentId" : "5dbad3272d824764",
+      "name" : "write-start phase",
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "tags" : {
+         "context" : "cli",
+         "message" : "entering write-start phase...",
+         "tid" : 45,
+         "usid" : 41,
+         "phase" : "write-start"
+      },
+      "duration" : 9000,
+      "timestamp" : 1582644249206000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249216000,
+            "value" : "leaving write-start phase"
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "9e8744a372f309fb"
+   },
+   {
+      "tags" : {
+         "phase" : "prepare",
+         "usid" : 41,
+         "tid" : 45,
+         "message" : "entering prepare phase...",
+         "context" : "cli"
+      },
+      "duration" : 3000,
+      "timestamp" : 1582644249216000,
+      "annotations" : [
+         {
+            "value" : "leaving prepare phase",
+            "timestamp" : 1582644249219000
+         }
+      ],
+      "kind" : "SERVER",
+      "id" : "b63081bc8a788362",
+      "parentId" : "5dbad3272d824764",
+      "name" : "prepare phase",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171"
+   },
+   {
+      "id" : "975a4db3a6350d24",
+      "kind" : "SERVER",
+      "annotations" : [
+         {
+            "value" : "leaving commit phase",
+            "timestamp" : 1582644249238000
+         },
+         {
+            "value" : "releasing transaction lock",
+            "timestamp" : 1582644249238000
+         },
+         {
+            "value" : "all commit subscription notifications acknowledged",
+            "timestamp" : 1582644249236000
+         },
+         {
+            "timestamp" : 1582644249235000,
+            "value" : "delivering commit subscription notifications at prio 1"
+         }
+      ],
+      "timestamp" : 1582644249219000,
+      "duration" : 18000,
+      "tags" : {
+         "phase" : "commit",
+         "usid" : 41,
+         "tid" : 45,
+         "message" : "entering commit phase...",
+         "context" : "cli"
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "commit phase",
+      "parentId" : "5dbad3272d824764"
+   },
+   {
+      "kind" : "SERVER",
+      "id" : "5dbad3272d824764",
+      "annotations" : [
+         {
+            "value" : "applying transaction done",
+            "timestamp" : 1582644249238000
+         }
+      ],
+      "duration" : 65000,
+      "tags" : {
+         "usid" : 41,
+         "context" : "cli",
+         "message" : "applying transaction...",
+         "tid" : 45
+      },
+      "timestamp" : 1582644249173000,
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "parentId" : "f019edb858cbcdac",
+      "name" : "applying transaction"
+   },
+   {
+      "duration" : 3143000,
+      "annotations" : [
+         {
+            "timestamp" : 1582644249239000,
+            "value" : "sync-from ok"
+         },
+         {
+            "value" : "releasing device lock",
+            "timestamp" : 1582644249238000
+         }
+      ],
+      "name" : "sync-from",
+      "parentId" : "f019edb858cbcdac",
+      "remoteEndpoint" : {
+         "serviceName" : "ios1"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "timestamp" : 1582644246096000,
+      "tags" : {
+         "context" : "cli",
+         "tid" : 45,
+         "usid" : 41,
+         "device" : "ios1",
+         "message" : "sync-from...",
+         "subsystem" : "ncs"
+      },
+      "kind" : "CLIENT",
+      "id" : "6d81c7a7c7b85e26",
+      "localEndpoint" : {
+         "serviceName" : "NSO.ncs"
+      }
+   },
+   {
+      "remoteEndpoint" : {
+         "serviceName" : "cli"
+      },
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "name" : "user-session",
+      "parentId" : "a0360c9e2aae7551",
+      "kind" : "SERVER",
+      "id" : "a0360c9e2aae7551",
+      "timestamp" : 1582644246096000,
+      "tags" : {
+         "usid" : 41,
+         "context" : "cli"
+      }
+   },
+   {
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "remoteEndpoint" : {
+         "serviceName" : "cli"
+      },
+      "parentId" : "a0360c9e2aae7551",
+      "name" : "transaction",
+      "kind" : "SERVER",
+      "id" : "fd134bc46cdf70a4",
+      "tags" : {
+         "context" : "cli",
+         "tid" : 44,
+         "usid" : 41
+      },
+      "timestamp" : 1582644246096000
+   },
+   {
+      "remoteEndpoint" : {
+         "serviceName" : "cli"
+      },
+      "traceId" : "bd6fb511e9570171",
+      "localEndpoint" : {
+         "serviceName" : "NSO"
+      },
+      "name" : "transaction",
+      "parentId" : "a0360c9e2aae7551",
+      "kind" : "SERVER",
+      "id" : "f019edb858cbcdac",
+      "timestamp" : 1582644246096000,
+      "tags" : {
+         "usid" : 41,
+         "context" : "cli",
+         "tid" : 45
+      }
+   }
+]
