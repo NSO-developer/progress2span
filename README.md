@@ -1,12 +1,12 @@
 # Progress -> Span
 
-This script can convert progress traces taken from NSO and convert them to trace spans which can be consumed by tools like [Zipkin](https://zipkin.io)
+A script that converts progress traces taken from NSO to trace spans in JSON format that can be consumed by tools like [Zipkin](https://zipkin.io)
 
 # Quickstart
 
-1. Install Zipkin and Erlang (see Prerequisites below)
+Start by installing Zipkin and Erlang (see Prerequisites below).
 
-2. Enable progress trace to a CSV file in your NSO installation
+Enable progress trace to a CSV file in your NSO installation.
 
     admin@ncs# config
     Entering configuration mode terminal
@@ -19,27 +19,59 @@ This script can convert progress traces taken from NSO and convert them to trace
     admin@ncs(config-trace-csv)# exit
     admin@ncs(config)# exit
 
-3. Do some activity that you want to trace...
+Do some activity that you want to trace...
 
-4. Copy the trace file
+...and then copy the trace file
 
     > cp .../logs/trace.csv .
 
-5. Generate a JSON file
+Generate a JSON file
 
     > make trace.json
 
-6. Start zipkin (in a separate terminal)
+Start zipkin (in a separate terminal)
 
     > make zipkin
 
-7. Upload the trace file
+Upload the trace file
 
     > make trace.upload
 
-8. Browse the Zipkin server
+Browse the Zipkin server
 
     > open "http://127.0.0.1:9411/zipkin/"
+
+
+# Even Quicker Start
+
+Make sure you have the Prerequisites, as well as download a copy of the IOS NED. Unpack the NED somewhere (for example in the demo directory). Then you can do the following:
+
+    > cd demo
+    > make IOS_NED=./cisco-ios-cli-6.45
+
+(But make sure to replace `./cisco-ios-cli-6.45` with the real path to your IOS NED)
+
+    > make start
+    > make enable
+    > make cli
+    admin@ncs# devices sync-from
+    admin@ncs# exit
+    > cp ncs-runtime/logs/trace.csv ..
+    > cd ..
+    > make trace.json
+
+Now start zipkin (in a separate terminal)
+
+    > make zipkin
+
+Then back to the first terminal, and upload the trace
+
+    > make trace.upload
+    > open "http://127.0.0.1:9411/zipkin/"
+
+Hit the search button in the UI and your trace should show up (may have to search back in time). You should see something like this:
+
+![Screenshot](demo/screenshot.png)
 
 
 # Prerequisites

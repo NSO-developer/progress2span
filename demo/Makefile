@@ -41,7 +41,7 @@ ncs-runtime: netsim
 
 
 clean:
-	$(MAKE) -k stop || true
+	$(MAKE) -k stop > /dev/null 2>&1 || true
 	rm -rf ./netsim ./ncs-runtime
 	rm -f  ./cisco-ios-cli
 
