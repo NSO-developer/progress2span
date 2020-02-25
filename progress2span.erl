@@ -35,10 +35,18 @@
             _ -> ok
         end).
 
+-define(info_debug(IF, IA, DF, DA),
+        case get(info) of
+            info  -> io:format(standard_error, IF, IA);
+            debug -> io:format(standard_error, DF, DA);
+            _ -> ok
+        end).
+
+
 main(Args0) ->
     check_version(),
     {Args, Options} = get_opt(Args0, #options{}),
-    %% io:format("Options: ~999p\nArgs: ~p\n", [Options, Args]),
+    ?debug("Args: ~p\nOptions: ~p\n", [Args, Options]),
     {I, O} = file_args(Args),
     process(I, O, Options),
     erlang:halt(0).
@@ -290,7 +298,7 @@ handle_trace(Trace, S0) ->
         {annotation, Key} ->
             S2 = add_annotation_to_current(Key, Trace, S1),
             special_span_annotation(Trace, S2);
-        {ignore, _} ->
+        ignore ->
             S1
     end.
 
@@ -389,13 +397,17 @@ vt_span(Trace, USpan, State) ->
 
 push_span(Key, Span, #state{cspans = C, astacks = Stacks} = State) ->
     case maps:is_key(Key, C) of
-        true ->  ?info("Duplicate key: ~p\n", [Key]);
-        false -> ok
-    end,
-    SKey = stack_key(Key),
-    Stack = maps:get(SKey, Stacks, []),
-    State#state{cspans = maps:put(Key, Span, C),
-                astacks = maps:put(SKey, [Key|Stack], Stacks)}.
+        true ->
+            ?info_debug("Duplicate key: ~p (ignoring this span)\n", [Key],
+                        "Duplicate key ~p\n  Previous: ~p\n",
+                        [Key, maps:get(Key, C)]),
+            State;
+        false ->
+            SKey = stack_key(Key),
+            Stack = maps:get(SKey, Stacks, []),
+            State#state{cspans = maps:put(Key, Span, C),
+                        astacks = maps:put(SKey, [Key|Stack], Stacks)}
+    end.
 
 pop_span(Key, #state{cspans = C, astacks = AStacks} = State) ->
     case maps:take(Key, C) of
@@ -457,12 +469,19 @@ add_annotation_to_current(AKey, Trace, #state{cspans=C, vspans=V} = State) ->
     end.
 
 classify(Trace, State) ->
-    Type = trace_type(Trace),
-    TS = trace_ts(Trace),
-    case trace_has_duration(Trace) of
-        _ when TS < State#state.options#options.from orelse
-               TS > State#state.options#options.to ->
+    case trace_ts(Trace) of
+        TS when TS < State#state.options#options.from orelse
+                TS > State#state.options#options.to ->
             ignore;
+        _ ->
+            Type = trace_type(Trace),
+            classify_warn(Trace, Type),
+            {Type, key(Trace)}
+    end.
+
+%% Warn about events that don't seem to match the classification
+classify_warn(Trace, Type) ->
+    case trace_has_duration(Trace) of
         true when Type == start ->
             ?info("START MSG W DURATION:\n  ~999p\n", [Trace]);
         true when Type == annotation ->
@@ -473,8 +492,7 @@ classify(Trace, State) ->
             ?info("UNKNOWN (has_duration: ~p)\n  ~999p\n", [_D, Trace]);
         _ ->
             ok
-    end,
-    {Type, key(Trace)}.
+    end.
 
 key(Trace) ->
     {musid(Trace), mtid(Trace), trace_name(Trace), trace_device(Trace)}.
@@ -658,7 +676,36 @@ hexstr(Binary) when is_binary(Binary) ->
 
 pt2map(Line) ->
     TraceMap0 = makemap(Line, pt_fmt(length(Line))),
-    maps:put(name, transform_message(trace_msg(TraceMap0)), TraceMap0).
+    TraceMap1 = fix_ned_duration(TraceMap0),
+    maps:put(name, transform_message(trace_msg(TraceMap1)), TraceMap1).
+
+%% The NedCom library appends " [NNN ms]" to some messages. Remove it
+%% from the message, but use the time as the duration for this trace
+%% entry.
+fix_ned_duration(Map) ->
+    fix_ned_duration(Map, trace_has_duration(Map)).
+fix_ned_duration(Map, true) ->
+    Map;
+fix_ned_duration(Map, false) ->
+    Str = trace_msg(Map),
+    Sz = byte_size(Str) - 4,
+    case Str of
+        <<S1:Sz/binary,  " ms]">> ->
+            case string:split(S1, " [", trailing) of
+                [NewMsg, DurationStr] ->
+                    case string:to_integer(DurationStr) of
+                        {Duration, <<>>} when is_integer(Duration) ->
+                            Map#{duration => Duration * 1000,
+                                 message  => NewMsg};
+                        _ ->
+                            Map
+                    end;
+                _ ->
+                    Map
+            end;
+        _ ->
+            Map
+    end.
 
 pt_fmt(14) ->
     [{timestamp,timestamp},
@@ -696,7 +743,7 @@ pt_fmt(15) ->
                 end},
      message].
 
-%% FIXME
+%% Turn the message into a "key" to an event that has a "start" and "stop" msg
 transform_message(Msg0) ->
     Msg1 =
         lists:foldl(
@@ -777,8 +824,7 @@ to_float(Str) ->
             to_int(Str) + 0.0
     end.
 
-
-
+%% A trace entry is either a start, stop, annotation, or of 'unknown' type
 trace_type(Trace) ->
     case trace_has_usid_and_tid(Trace) of
         true ->
