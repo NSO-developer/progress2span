@@ -69,9 +69,11 @@ Then back to the first terminal, and upload the trace
     > make trace.upload
     > open "http://127.0.0.1:9411/zipkin/"
 
-Hit the search button in the UI and your trace should show up (may have to search back in time). You should see something like this:
+Hit the search button in the UI and your trace should show up (may have to search back in time).
 
-![Screenshot](demo/screenshot.png)
+Here is a quick screencast of what it could look like:
+
+![Screenshot](demo/screencast.gif)
 
 
 # Prerequisites
